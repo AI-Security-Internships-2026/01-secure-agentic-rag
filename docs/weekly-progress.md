@@ -1,7 +1,7 @@
 # Weekly Progress Log: Secure Agentic RAG for Cybersecurity Knowledge Bases
 
-**Student:** _[Fill in your name]_
-**GitHub username:** _[Fill in]_
+**Student:** _Taha Bin Hanif_
+**GitHub username:** _TahaHanif2424_
 
 ---
 
@@ -18,14 +18,14 @@ Be honest — problems and blockers are normal and help your supervisor support 
 **PR link:** _[Add link after opening PR]_
 
 ### Completed this week
-- [ ] Read README and proposal
-- [ ] Set up local environment (Python venv, dependencies)
-- [ ] Ran `src/main.py` successfully
-- [ ] Wrote personal introduction (below)
-- [ ] Identified 5 related papers / tools / datasets
+- [✓] Read README and proposal
+- [✓] Set up local environment (Python venv, dependencies)
+- [✓] Ran `src/main.py` successfully
+- [✓] Wrote personal introduction (below)
+- [✓] Identified 5 related papers / tools / datasets
 
 ### Personal Introduction
-_Write 3–5 sentences about your background, skills, and what you hope to learn._
+I am Taha Bin Hanif a final year Computer Science student from NUST. My experties are Web Development, AGentic AI, RAG, DevOps. I have worked in couple of organization as a Full Stack Developer. Currently I'm more into agentic AI and DevOps. I am exploring these fields more and hope to get enough knowledge of these.
 
 ### Problems / Blockers
 _Describe any issues you faced. Did you solve them? How?_

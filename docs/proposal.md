@@ -1,9 +1,9 @@
 # Research Proposal: Secure Agentic RAG for Cybersecurity Knowledge Bases
 
-**Student:** _[Fill in your name]_
-**Supervisor:** _[Fill in supervisor name]_
-**Start date:** _[Fill in]_
-**Expected end date:** _[Fill in]_
+**Student:** _Taha Bin Hanif_
+**Supervisor:** _Dr. Rana AbuBakar_
+**Start date:** _8 June 2026_
+**Expected end date:** _8 September 2026_
 
 ---
 
@@ -17,8 +17,8 @@ This project is carried out within the AI Security research agenda of CNIT/PNTLa
 
 ## 2. Problem Statement
 
-_Describe in 3–5 sentences the specific gap or challenge this project addresses.
-Be precise: what is broken, missing, or insufficiently studied?_
+Current Retrieval-Augmented Generation (RAG) systems lack robust security when interacting with sensitive or restricted data sources, making them vulnerable to unauthorized access and data leakage. Existing solutions often fail to enforce fine-grained access control or provide comprehensive auditability during retrieval operations. Additionally, prompt injection attacks remain an under-addressed threat, allowing malicious inputs to manipulate agent behavior and bypass safeguards. There is a clear gap in integrating secure, policy-driven retrieval with autonomous agents in a scalable, cloud-native environment. This project addresses these limitations by combining Kubernetes-native orchestration with strict access control, audit logging, and prompt injection guardrails.
+
 
 ---
 
