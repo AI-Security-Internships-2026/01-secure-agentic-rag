@@ -1,12 +1,12 @@
-# Secure Agentic RAG for Cybersecurity Knowledge Bases
+# Kubernetes Native Secure Agentic RAG Prompt Injection Guardrails
 
 > **CNIT/PNTLab Pisa · TECIP · Scuola Superiore Sant'Anna — AI Security Internship 2026**
 
 ---
 
 ## Research Problem
+A scalable RAG pipeline where autonomous agents securely query restricted cybersecurity knowledge bases with enforced access control, audit logging, and robust prompt injection defenses.
 
-Build a retrieval-augmented generation (RAG) pipeline where autonomous agents securely query restricted cybersecurity knowledge bases, enforcing access control and audit logging at every retrieval step.
 
 ---
 
