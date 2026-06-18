@@ -18,17 +18,17 @@ Be honest — problems and blockers are normal and help your supervisor support 
 **PR link:** _[Add link after opening PR]_
 
 ### Completed this week
-- [✓] Read README and proposal
-- [✓] Set up local environment (Python venv, dependencies)
-- [✓] Ran `src/main.py` successfully
-- [✓] Wrote personal introduction (below)
-- [✓] Identified 5 related papers / tools / datasets
+- [x] Read README and proposal
+- [x] Set up local environment (Python venv, dependencies)
+- [x] Ran `src/main.py` successfully
+- [x] Wrote personal introduction (below)
+- [x] Identified 5 related papers / tools / datasets
 
 ### Personal Introduction
-I am Taha Bin Hanif a final year Computer Science student from NUST. My experties are Web Development, AGentic AI, RAG, DevOps. I have worked in couple of organization as a Full Stack Developer. Currently I'm more into agentic AI and DevOps. I am exploring these fields more and hope to get enough knowledge of these.
+I am Taha Bin Hanif a final year Computer Science student from NUST. My experties are Web Development, Agentic AI, RAG, DevOps. I have worked in couple of organization as a Full Stack Developer. Currently I'm more into agentic AI and DevOps. I am exploring these fields more and hope to get enough knowledge of these. In this internship, I will try to learn RAG and Agentic in more depth and will try to bring the concepts of cyber security in Agentic AI and RAG system so maintain secutiry and trust of the user.
 
 ### Problems / Blockers
-_Describe any issues you faced. Did you solve them? How?_
+Reading papers were a problem for me. I wasn't sure about what to read. And as a UG student it is very hard for us to focus and read research papaers. This was a step that took longer than i thought. But with consistency it was resolved and i was able to read those papers.
 
 ### Next week plan
 - Read the 5 papers identified this week
