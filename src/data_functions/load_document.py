@@ -3,6 +3,9 @@ import google.generativeai as genai
 from llama_index.readers.file import PDFReader
 from llama_index.core.node_parser import SentenceSplitter
 from dotenv import load_dotenv
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from database.db import add_documents
 
 load_dotenv()
 
@@ -79,8 +82,33 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     return embeddings
 
 
-if __name__ == "__main__":
+import re
 
+def store_embeddings(chunks, embeddings, file_path):
+    """
+    Automatically extracts the filename, sanitizes it, and uses it
+    as the ChromaDB collection name to store the chunks and embeddings.
+    """
+    # Extract filename without directory and extension
+    base_name = os.path.basename(file_path)
+    name_without_ext = os.path.splitext(base_name)[0]
+    
+    # Sanitize the name for ChromaDB requirements (lowercase, 3-63 chars, alphanumeric/underscore/hyphen)
+    collection_name = name_without_ext.lower().strip()
+    collection_name = re.sub(r'[^a-z0-9_-]', '_', collection_name)
+    collection_name = re.sub(r'_+', '_', collection_name).strip('_')
+    
+    # Fallback if the name is too short
+    if len(collection_name) < 3:
+        collection_name = f"col_{collection_name}"
+        
+    collection_name = collection_name[:63]
+    
+    print(f"Storing in ChromaDB collection: '{collection_name}'")
+    add_documents(collection_name=collection_name, texts=chunks, embeddings=embeddings)
+
+    
+if __name__ == "__main__":
     test_pdf = "../../datasets/system design.pdf"
     if os.path.exists(test_pdf):
         print(f"Loading and chunking PDF: {test_pdf}")
@@ -90,6 +118,7 @@ if __name__ == "__main__":
             print("Embedding first chunk...")
             embeddings = embed_texts([chunks[0]])
             print(f"Embedding vector dimension: {len(embeddings[0])}")
+            # Test storing the single embedded chunk using the automatic filename extraction
+            store_embeddings([chunks[0]], embeddings, test_pdf)
     else:
         print("Set a valid PDF file path to run test.")
-    pass

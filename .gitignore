@@ -65,3 +65,8 @@ credentials/
 # Results that can be reproduced
 experiments/results/*.png
 experiments/results/*.pdf
+
+# Database
+exported_database.csv
+chroma_db/
+chromadb/

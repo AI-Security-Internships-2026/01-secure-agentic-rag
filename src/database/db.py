@@ -50,9 +50,11 @@ def add_documents(
         start_id = collection.count()
         ids = [f"doc_{start_id + i}" for i in range(len(texts))]
 
-    # Ensure metadatas exist (defaults to empty dicts)
+    # Ensure metadatas exist and do not contain empty dicts (ChromaDB rejects empty dicts)
     if metadatas is None:
-        metadatas = [{} for _ in range(len(texts))]
+        metadatas = [{"source": "unknown"} for _ in range(len(texts))]
+    else:
+        metadatas = [m if m else {"source": "unknown"} for m in metadatas]
 
     collection.add(
         documents=texts,
@@ -78,3 +80,23 @@ def query_documents(
         n_results=n_results
     )
     return results
+
+
+def get_all_documents(collection_name: str, include: List[str] = None) -> Dict[str, Any]:
+    """
+    Retrieves all stored items (documents, metadatas, IDs) from the collection.
+    By default, returns everything.
+    """
+    collection = get_or_create_collection(collection_name)
+    # include defaults to ['documents', 'metadatas']
+    if include is None:
+        include = ["documents", "metadatas"]
+    return collection.get(include=include)
+
+
+def get_collection_count(collection_name: str) -> int:
+    """
+    Returns the total number of items stored in the collection.
+    """
+    collection = get_or_create_collection(collection_name)
+    return collection.count()
