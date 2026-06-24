@@ -8,3 +8,6 @@ fastapi
 uvicorn
 python-dotenv
 requests
+google-generativeai
+llama-index
+llama-index-readers-file
