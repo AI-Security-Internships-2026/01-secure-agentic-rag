@@ -1,22 +1,24 @@
 import os
-import google.generativeai as genai
+import requests
+import time
 from llama_index.readers.file import PDFReader
 from llama_index.core.node_parser import SentenceSplitter
 from dotenv import load_dotenv
 import sys
+import re
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from database.db import add_documents
+from database.db import add_documents, get_client
 
 load_dotenv()
+
+import google.generativeai as genai
 
 # Configure Gemini API
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 EMBED_MODEL = os.getenv("EMBED_MODEL", "models/gemini-embedding-001")
 EMBED_DIM = 768  # Gemini embedding dimension (important!)
-
-splitter = SentenceSplitter(chunk_size=1000, chunk_overlap=200)
-
 
 def _normalize_model_name(name: str) -> str:
     return name if name.startswith("models/") else f"models/{name}"
@@ -58,6 +60,8 @@ def _choose_embedding_model() -> str:
 
 RESOLVED_EMBED_MODEL = _choose_embedding_model()
 
+splitter = SentenceSplitter(chunk_size=1000, chunk_overlap=200)
+
 
 def load_and_chunk_pdf(path: str):
     docs = PDFReader().load_data(file=path)
@@ -70,7 +74,6 @@ def load_and_chunk_pdf(path: str):
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
     embeddings = []
-
     for text in texts:
         response = genai.embed_content(
             model=RESOLVED_EMBED_MODEL,
@@ -82,7 +85,6 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     return embeddings
 
 
-import re
 
 def store_embeddings(chunks, embeddings, file_path):
     """
@@ -104,21 +106,32 @@ def store_embeddings(chunks, embeddings, file_path):
         
     collection_name = collection_name[:63]
     
-    print(f"Storing in ChromaDB collection: '{collection_name}'")
+    # Delete collection if it already exists to guarantee clean reload
+    client = get_client()
+    try:
+        client.delete_collection(name=collection_name)
+        print(f"Deleted existing collection '{collection_name}' for clean reload.")
+    except Exception:
+        pass
+
+    print(f"Storing {len(chunks)} chunks in ChromaDB collection: '{collection_name}'")
     add_documents(collection_name=collection_name, texts=chunks, embeddings=embeddings)
 
-    
+
 if __name__ == "__main__":
-    test_pdf = "../../datasets/system design.pdf"
+    # Resolve the PDF path relative to this script's directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    test_pdf = os.path.normpath(os.path.join(script_dir, "../../datasets/paper.pdf"))
+    
     if os.path.exists(test_pdf):
         print(f"Loading and chunking PDF: {test_pdf}")
         chunks = load_and_chunk_pdf(test_pdf)
         print(f"Created {len(chunks)} chunks.")
         if chunks:
-            print("Embedding first chunk...")
-            embeddings = embed_texts([chunks[0]])
-            print(f"Embedding vector dimension: {len(embeddings[0])}")
-            # Test storing the single embedded chunk using the automatic filename extraction
-            store_embeddings([chunks[0]], embeddings, test_pdf)
+            print("Embedding and storing all chunks in ChromaDB...")
+            embeddings = embed_texts(chunks)
+            print(f"Total embeddings generated: {len(embeddings)}")
+            store_embeddings(chunks, embeddings, test_pdf)
+            print("Successfully loaded document into ChromaDB!")
     else:
-        print("Set a valid PDF file path to run test.")
+        print(f"Set a valid PDF file path. File not found at: {test_pdf}")
