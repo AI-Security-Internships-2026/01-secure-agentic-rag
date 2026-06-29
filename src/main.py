@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from data_functions.load_document import load_and_chunk_pdf, embed_texts, store_embeddings
-from database.db import get_collection_count
 from data_functions.query_engine import query_rag_system
 
 load_dotenv()

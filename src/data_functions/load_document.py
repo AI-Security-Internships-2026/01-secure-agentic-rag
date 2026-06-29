@@ -1,6 +1,4 @@
 import os
-import requests
-import time
 from llama_index.readers.file import PDFReader
 from llama_index.core.node_parser import SentenceSplitter
 from dotenv import load_dotenv
@@ -72,16 +70,21 @@ def load_and_chunk_pdf(path: str):
     return chunks
 
 
-def embed_texts(texts: list[str]) -> list[list[float]]:
+def embed_texts(texts: list[str], batch_size: int = 100) -> list[list[float]]:
+    """
+    Generates embeddings for a list of texts using the Gemini embedding model in batches.
+    Optimized to reduce network roundtrips.
+    """
     embeddings = []
-    for text in texts:
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
         response = genai.embed_content(
             model=RESOLVED_EMBED_MODEL,
-            content=text,
+            content=batch,
             task_type="retrieval_document",  # important for RAG
             output_dimensionality=EMBED_DIM,
         )
-        embeddings.append(response["embedding"])
+        embeddings.extend(response["embedding"])
     return embeddings
 
 
