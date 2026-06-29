@@ -39,6 +39,7 @@ datasets/**/*.npz
 datasets/**/*.zip
 datasets/**/*.tar.gz
 datasets/**/*.pcap
+datasets/**/*.pdf
 
 # Model checkpoints
 *.pt

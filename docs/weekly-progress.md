@@ -39,17 +39,25 @@ Reading papers were a problem for me. I wasn't sure about what to read. And as a
 
 ## Week 2
 
-**Branch:** `your-name-week-02`
+**Branch:** `taha-week-02`
 **PR link:** _[Add link after opening PR]_
 
 ### Completed this week
--
+- Wrote personal introduction, updated checkboxes, and updated README title per Week 1 feedback.
+- Completed proposal.md Section 3 (Research Questions) and Section 4 (Proposed Methodology).
+- Added three new research papers on RAG access control and agent security to literature-review.md.
+- Built a PDF ingestion pipeline (LlamaIndex + SentenceSplitter + Gemini Embedding API) with local fallback.
+- Implemented persistent ChromaDB database client and query utilities.
+- Implemented query retrieval and answering engine using Groq API.
+- Implemented interactive CLI interface (src/main.py) which automatically embeds datasets/system design.pdf if ChromaDB is empty, and allows user Q&A.
+- Untracked database and binary PDF files from Git repository and added them to `.gitignore`.
 
 ### Problems / Blockers
--
+- Binary files like `chroma.sqlite3` and `system design.pdf` were previously committed and tracked, which bypassed the `.gitignore` rules. This was resolved by running `git rm --cached` on these paths.
 
 ### Next week plan
--
+- Begin implementation of secure agentic reasoning and evaluation using security controls.
+- Conduct initial evaluation of security threats against the RAG system.
 
 ---
 
