@@ -86,12 +86,10 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
 
 
 
-def store_embeddings(chunks, embeddings, file_path):
+def get_sanitized_collection_name(file_path: str) -> str:
     """
-    Automatically extracts the filename, sanitizes it, and uses it
-    as the ChromaDB collection name to store the chunks and embeddings.
+    Extracts the filename, sanitizes it, and returns it as a valid ChromaDB collection name.
     """
-    # Extract filename without directory and extension
     base_name = os.path.basename(file_path)
     name_without_ext = os.path.splitext(base_name)[0]
     
@@ -104,7 +102,16 @@ def store_embeddings(chunks, embeddings, file_path):
     if len(collection_name) < 3:
         collection_name = f"col_{collection_name}"
         
-    collection_name = collection_name[:63]
+    return collection_name[:63]
+
+
+def store_embeddings(chunks, embeddings, file_path):
+    """
+    Automatically extracts the filename, sanitizes it, and uses it
+    as the ChromaDB collection name to store the chunks and embeddings.
+    Returns the collection name.
+    """
+    collection_name = get_sanitized_collection_name(file_path)
     
     # Delete collection if it already exists to guarantee clean reload
     client = get_client()
@@ -116,6 +123,7 @@ def store_embeddings(chunks, embeddings, file_path):
 
     print(f"Storing {len(chunks)} chunks in ChromaDB collection: '{collection_name}'")
     add_documents(collection_name=collection_name, texts=chunks, embeddings=embeddings)
+    return collection_name
 
 
 if __name__ == "__main__":
