@@ -24,9 +24,11 @@ Current Retrieval-Augmented Generation (RAG) systems lack robust security when i
 
 ## 3. Research Questions
 
-1. _RQ1: ..._
-2. _RQ2: ..._
-3. _RQ3: ..._
+1. _RQ1: How can fine-grained, policy-driven access control be integrated into agentic Retrieval-Augmented Generation (RAG) systems to prevent unauthorized access to sensitive cybersecurity knowledge bases?
+2. _RQ2: To what extent can prompt injection guardrails mitigate malicious manipulation of autonomous agents in RAG pipelines without degrading system performance or response quality?
+3. _RQ3: How can audit logging and traceability be designed in Kubernetes-native agentic RAG systems to ensure accountability, reproducibility, and security compliance during multi-step retrieval and reasoning processes?
+4. _RQ4: How does the integration of security mechanisms (access control, prompt filtering, and audit logging) impact the scalability and latency of Kubernetes-native agentic RAG systems under realistic workloads?
+5. _RQ5: How resilient are secure agentic RAG systems against combined attack vectors (e.g., prompt injection, data poisoning, and tool misuse) in dynamic, real-world cybersecurity knowledge environments?
 
 ---
 

@@ -39,6 +39,7 @@ datasets/**/*.npz
 datasets/**/*.zip
 datasets/**/*.tar.gz
 datasets/**/*.pcap
+datasets/**/*.pdf
 
 # Model checkpoints
 *.pt
@@ -65,3 +66,8 @@ credentials/
 # Results that can be reproduced
 experiments/results/*.png
 experiments/results/*.pdf
+
+# Database
+exported_database.csv
+chroma_db/
+chromadb/
