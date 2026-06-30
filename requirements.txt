@@ -11,3 +11,5 @@ requests
 google-generativeai
 llama-index
 llama-index-readers-file
+presidio-analyzer 
+presidio-anonymizer
