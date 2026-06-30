@@ -53,6 +53,38 @@ class TestLoadDocument(unittest.TestCase):
             self.assertTrue(any("<PERSON>" in chunk for chunk in chunks))
             self.assertTrue(any("<EMAIL_ADDRESS>" in chunk for chunk in chunks))
 
+    @patch("data_functions.load_document.os.getenv")
+    def test_register_custom_recognizers(self, mock_getenv):
+        # We mock getenv to return some dummy values
+        def side_effect(key, default=None):
+            if key == "PRESIDIO_CUSTOM_DENY_LIST":
+                return "SecretProject, AlphaTeam"
+            elif key == "PRESIDIO_CUSTOM_PATTERNS":
+                return '[{"entity": "STUDENT_ID", "regex": "\\\\bSTD-\\\\d{6}\\\\b", "score": 0.95}]'
+            return default
+        mock_getenv.side_effect = side_effect
+        
+        # Create a mock analyzer with a mock registry
+        mock_analyzer = MagicMock()
+        mock_analyzer.registry = MagicMock()
+        
+        from data_functions.load_document import _register_custom_recognizers
+        _register_custom_recognizers(mock_analyzer)
+        
+        # Verify that registry.add_recognizer was called twice (once for deny list, once for regex)
+        self.assertEqual(mock_analyzer.registry.add_recognizer.call_count, 2)
+        
+        # Inspect mock calls to ensure correct types/entities
+        calls = mock_analyzer.registry.add_recognizer.call_args_list
+        entity_types = []
+        for call in calls:
+            entity_types.extend(call[0][0].supported_entities)
+        
+        self.assertIn("CUSTOM_DENY_LIST", entity_types)
+        self.assertIn("STUDENT_ID", entity_types)
+
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -4,6 +4,8 @@ from llama_index.core.node_parser import SentenceSplitter
 from dotenv import load_dotenv
 import sys
 import re
+import json
+
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from database.db import add_documents, get_client
@@ -65,6 +67,62 @@ _analyzer = None
 _anonymizer = None
 
 
+def _register_custom_recognizers(analyzer):
+    """
+    Registers custom recognizers configured from the .env environment variables.
+    """
+    from presidio_analyzer import PatternRecognizer, Pattern
+    
+    # 1. Custom Deny List
+    custom_deny_list_str = os.getenv("PRESIDIO_CUSTOM_DENY_LIST")
+    if custom_deny_list_str:
+        # Split by comma, strip whitespace, and filter out empty strings
+        deny_list = [item.strip() for item in custom_deny_list_str.split(",") if item.strip()]
+        if deny_list:
+            print(f"Registering custom Presidio deny list with terms: {deny_list}")
+            deny_list_recognizer = PatternRecognizer(
+                supported_entity="CUSTOM_DENY_LIST",
+                deny_list=deny_list,
+                deny_list_score=1.0
+            )
+            analyzer.registry.add_recognizer(deny_list_recognizer)
+            
+    # 2. Custom Regex/Pattern Recognizers (JSON)
+    custom_patterns_json = os.getenv("PRESIDIO_CUSTOM_PATTERNS")
+    if custom_patterns_json:
+        try:
+            patterns_data = json.loads(custom_patterns_json)
+            if not isinstance(patterns_data, list):
+                print("Error: PRESIDIO_CUSTOM_PATTERNS should be a JSON array/list.")
+                patterns_data = []
+            
+            for item in patterns_data:
+                entity = item.get("entity")
+                regex_str = item.get("regex")
+                if not entity or not regex_str:
+                    print(f"Skipping invalid custom pattern configuration: {item}")
+                    continue
+                    
+                score = float(item.get("score", 0.85))
+                context = item.get("context", None)
+                
+                print(f"Registering custom Presidio regex recognizer for entity '{entity}': {regex_str}")
+                pattern = Pattern(
+                    name=f"{entity.lower()}_pattern",
+                    regex=regex_str,
+                    score=score
+                )
+                
+                recognizer = PatternRecognizer(
+                    supported_entity=entity,
+                    patterns=[pattern],
+                    context=context
+                )
+                analyzer.registry.add_recognizer(recognizer)
+        except Exception as e:
+            print(f"Error parsing PRESIDIO_CUSTOM_PATTERNS: {e}")
+
+
 def get_analyzer_and_anonymizer():
     """
     Lazily initializes and returns the Presidio Analyzer and Anonymizer engines.
@@ -76,6 +134,10 @@ def get_analyzer_and_anonymizer():
             from presidio_anonymizer import AnonymizerEngine
             _analyzer = AnalyzerEngine()
             _anonymizer = AnonymizerEngine()
+            
+            # Register custom recognizers configured from environment variables
+            _register_custom_recognizers(_analyzer)
+
         except Exception as e:
             print(f"Error initializing Presidio engines: {e}")
             print("Please ensure you have downloaded the required spaCy model (e.g., run `python -m spacy download en_core_web_lg`).")
@@ -101,10 +163,6 @@ def load_and_chunk_pdf(path: str):
     chunks = []
     for t in anonymized_texts:
         chunks.extend(splitter.split_text(t))
-
-    print("\n--- Anonymized Chunks ---")
-    for idx, chunk in enumerate(chunks):
-        print(f"Chunk {idx + 1}:\n{chunk}\n{'-' * 40}")
 
     return chunks
 
