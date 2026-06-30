@@ -61,13 +61,54 @@ RESOLVED_EMBED_MODEL = _choose_embedding_model()
 splitter = SentenceSplitter(chunk_size=1000, chunk_overlap=200)
 
 
+_analyzer = None
+_anonymizer = None
+
+
+def get_analyzer_and_anonymizer():
+    """
+    Lazily initializes and returns the Presidio Analyzer and Anonymizer engines.
+    """
+    global _analyzer, _anonymizer
+    if _analyzer is None:
+        try:
+            from presidio_analyzer import AnalyzerEngine
+            from presidio_anonymizer import AnonymizerEngine
+            _analyzer = AnalyzerEngine()
+            _anonymizer = AnonymizerEngine()
+        except Exception as e:
+            print(f"Error initializing Presidio engines: {e}")
+            print("Please ensure you have downloaded the required spaCy model (e.g., run `python -m spacy download en_core_web_lg`).")
+            raise e
+    return _analyzer, _anonymizer
+
+
 def load_and_chunk_pdf(path: str):
     docs = PDFReader().load_data(file=path)
     texts = [d.text for d in docs if getattr(d, "text", None)]
-    chunks = []
+    
+    analyzer, anonymizer = get_analyzer_and_anonymizer()
+    
+    anonymized_texts = []
     for t in texts:
+        if not t.strip():
+            anonymized_texts.append(t)
+            continue
+        results = analyzer.analyze(text=t, language="en")
+        redacted = anonymizer.anonymize(text=t, analyzer_results=results)
+        anonymized_texts.append(redacted.text)
+        
+    chunks = []
+    for t in anonymized_texts:
         chunks.extend(splitter.split_text(t))
+
+    print("\n--- Anonymized Chunks ---")
+    for idx, chunk in enumerate(chunks):
+        print(f"Chunk {idx + 1}:\n{chunk}\n{'-' * 40}")
+
     return chunks
+
+
 
 
 def embed_texts(texts: list[str], batch_size: int = 100) -> list[list[float]]:
