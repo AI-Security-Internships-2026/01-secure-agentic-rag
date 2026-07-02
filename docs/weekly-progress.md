@@ -56,9 +56,34 @@ Reading papers were a problem for me. I wasn't sure about what to read. And as a
 - Binary files like `chroma.sqlite3` and `system design.pdf` were previously committed and tracked, which bypassed the `.gitignore` rules. This was resolved by running `git rm --cached` on these paths.
 
 ### Next week plan
-- Begin implementation of secure agentic reasoning and evaluation using security controls.
-- Conduct initial evaluation of security threats against the RAG system.
+- Begin implementation of secure agentic reasoning and evaluation using security controls. (Completed)
+- Conduct initial evaluation of security threats against the RAG system. (Completed)
+
+---
+
+## Week 3
+
+**Branch:** `taha-week-03`
+**PR link:** _[Add link after opening PR]_
+
+### Completed this week
+- Configured SpiceDB client library (`authzed`) for Fine-Grained Authorization / ReBAC.
+- Built a unified SpiceDB client ([spicedb_client.py](file:///c:/Users/tahah/OneDrive/Desktop/01-secure-agentic-rag/src/database/spicedb_client.py)) supporting live gRPC connections and an in-memory `SpiceDBSimulator` fallback engine.
+- Implemented automatic SpiceDB schema verification and writing (`user`, `document`, `chunk` DSL definitions) upon client connection initialization.
+- Integrated read-after-write consistency (`fully_consistent=True`) to eliminate eventual consistency replication latency in tests and interactive lookups.
+- Enhanced text chunking ingestion in [load_document.py](file:///c:/Users/tahah/OneDrive/Desktop/01-secure-agentic-rag/src/data_functions/load_document.py) to write `document_id` and `chunk_id` to ChromaDB metadata and write relationship tuples to SpiceDB on ingestion.
+- Implemented **Pre-filtering** (via `LookupResources`) and **Post-filtering** (via `CheckPermission`) RAG context authorization paths in [query_engine.py](file:///c:/Users/tahah/OneDrive/Desktop/01-secure-agentic-rag/src/data_functions/query_engine.py).
+- Configured Docker Compose deployment ([docker-compose.yml](file:///c:/Users/tahah/OneDrive/Desktop/01-secure-agentic-rag/docker-compose.yml)) containing PostgreSQL backend database, transient auto-migrations setup (`spicedb-migrate`), and the SpiceDB server daemon.
+- Created interactive CLI user switching (`\user`), filtering mode changes (`\mode`), and simulator scanner (`\spicedb`) commands inside [main.py](file:///c:/Users/tahah/OneDrive/Desktop/01-secure-agentic-rag/src/main.py) with permission metrics printouts.
+- Built and ran a comprehensive test suite ([test_spicedb.py](file:///c:/Users/tahah/OneDrive/Desktop/01-secure-agentic-rag/tests/test_spicedb.py)) verifying access boundary correctness and database queries.
+
+### Problems / Blockers
+- Ran into initial SpiceDB connection errors due to the container running without the `serve` command and executing help by default. Resolved by updating the docker-compose commands and introducing a `spicedb-migrate` container to run schema migrations before the server starts.
+- Encountered eventual consistency latency issues in test check permissions which was resolved by enforcing full consistency on read requests.
+
+### Next week plan
 
 ---
 
 _(Add a new section each week)_
+
