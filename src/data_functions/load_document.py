@@ -9,6 +9,7 @@ import json
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from database.db import add_documents, get_client
+from database.spicedb_client import get_spicedb_client
 
 load_dotenv()
 
@@ -167,8 +168,6 @@ def load_and_chunk_pdf(path: str):
     return chunks
 
 
-
-
 def embed_texts(texts: list[str], batch_size: int = 100) -> list[list[float]]:
     """
     Generates embeddings for a list of texts using the Gemini embedding model in batches.
@@ -207,10 +206,11 @@ def get_sanitized_collection_name(file_path: str) -> str:
     return collection_name[:63]
 
 
-def store_embeddings(chunks, embeddings, file_path):
+def store_embeddings(chunks, embeddings, file_path, owner_id: str = "admin", viewers: list[str] = None):
     """
     Automatically extracts the filename, sanitizes it, and uses it
     as the ChromaDB collection name to store the chunks and embeddings.
+    Also registers relationships in SpiceDB for user-based filtering.
     Returns the collection name.
     """
     collection_name = get_sanitized_collection_name(file_path)
@@ -223,25 +223,53 @@ def store_embeddings(chunks, embeddings, file_path):
     except Exception:
         pass
 
-    print(f"Storing {len(chunks)} chunks in ChromaDB collection: '{collection_name}'")
-    add_documents(collection_name=collection_name, texts=chunks, embeddings=embeddings)
-    return collection_name
-
-
-if __name__ == "__main__":
-    # Resolve the PDF path relative to this script's directory
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    test_pdf = os.path.normpath(os.path.join(script_dir, "../../datasets/paper.pdf"))
+    # Create metadatas and ids with unique chunk/doc parameters
+    ids = []
+    metadatas = []
+    tuples_to_write = []
     
-    if os.path.exists(test_pdf):
-        print(f"Loading and chunking PDF: {test_pdf}")
-        chunks = load_and_chunk_pdf(test_pdf)
-        print(f"Created {len(chunks)} chunks.")
-        if chunks:
-            print("Embedding and storing all chunks in ChromaDB...")
-            embeddings = embed_texts(chunks)
-            print(f"Total embeddings generated: {len(embeddings)}")
-            store_embeddings(chunks, embeddings, test_pdf)
-            print("Successfully loaded document into ChromaDB!")
-    else:
-        print(f"Set a valid PDF file path. File not found at: {test_pdf}")
+    # 1. Document relationship tuples
+    # Owner relationship
+    tuples_to_write.append(("document", collection_name, "owner", "user", owner_id))
+    # Viewer relationships
+    if viewers:
+        for viewer in viewers:
+            if viewer.strip() and viewer.strip() != owner_id:
+                tuples_to_write.append(("document", collection_name, "viewer", "user", viewer.strip()))
+
+    for i, chunk in enumerate(chunks):
+        chunk_id = f"{collection_name}_chunk_{i}"
+        ids.append(chunk_id)
+        
+        # Add document_id and chunk_id to metadata for pre/post filtering queries
+        metadatas.append({
+            "document_id": collection_name,
+            "chunk_id": chunk_id,
+            "source": file_path
+        })
+        
+        # 2. Chunk relationships (parent_document points to document)
+        tuples_to_write.append(("chunk", chunk_id, "parent_document", "document", collection_name))
+
+    print(f"Storing {len(chunks)} chunks in ChromaDB collection: '{collection_name}'")
+    add_documents(
+        collection_name=collection_name, 
+        texts=chunks, 
+        embeddings=embeddings, 
+        metadatas=metadatas, 
+        ids=ids
+    )
+
+    print("Registering permissions and relationships in SpiceDB...")
+    spicedb = get_spicedb_client()
+    try:
+        # Delete existing relationships for this document in SpiceDB to guarantee a clean reload
+        spicedb.delete_relationships("document", collection_name)
+        
+        # Write relationships to SpiceDB
+        spicedb.write_relationships(tuples_to_write)
+        print(f"Registered document '{collection_name}' permissions in SpiceDB (Owner: '{owner_id}', Viewers: {viewers or []}).")
+    except Exception as e:
+        print(f"Warning: Failed to write permissions to SpiceDB: {e}")
+
+    return collection_name
