@@ -25,45 +25,6 @@ ACTIVE_USER = "admin"
 FILTERING_MODE = "pre"
 
 
-def register_default_permissions(collection_name: str) -> None:
-    """
-    Registers demo/default relationship tuples for a collection in SpiceDB.
-    Sets 'admin' as owner, 'alice' as viewer, and does not register 'bob'.
-    Also registers chunk parent relationships if they exist in ChromaDB.
-    """
-    from database.spicedb_client import get_spicedb_client
-    from database.db import get_client
-    
-    print(f"\nRegistering default simulation permissions in SpiceDB for document '{collection_name}'...")
-    spicedb = get_spicedb_client()
-    
-    # 1. Document relations (admin is owner, alice is viewer, bob is not registered, hence has no access)
-    tuples = [
-        ("document", collection_name, "owner", "user", "admin"),
-        ("document", collection_name, "viewer", "user", "alice")
-    ]
-    
-    # 2. Query chroma to get all chunk IDs and link them
-    try:
-        chroma_client = get_client()
-        collection = chroma_client.get_or_create_collection(collection_name)
-        data = collection.get(include=["metadatas"])
-        chunk_ids = data.get("ids", [])
-        for cid in chunk_ids:
-            tuples.append(("chunk", cid, "parent_document", "document", collection_name))
-    except Exception as e:
-        print(f"Warning: Could not fetch chunks from Chroma to link parent document: {e}")
-        
-    try:
-        spicedb.delete_relationships("document", collection_name)
-        spicedb.write_relationships(tuples)
-        print(f"Default SpiceDB permissions registered for '{collection_name}':")
-        print(f"  - Owner: admin")
-        print(f"  - Viewer: alice")
-        print(f"  - No Access: bob (or any other user)")
-    except Exception as e:
-        print(f"Warning: Failed to write default permissions: {e}")
-
 
 def prompt_for_pdf() -> str:
     """
@@ -98,7 +59,7 @@ def index_new_pdf(pdf_path: str, owner_id: str = "admin") -> str:
         
         # Prompt for document viewers list
         print("\n--- Document Access Control configuration ---")
-        viewers_input = input("Enter comma-separated usernames allowed to view this document (e.g. alice, bob): ").strip()
+        viewers_input = input("Enter comma-separated usernames allowed to view this document: ").strip()
         viewers = [v.strip() for v in viewers_input.split(",") if v.strip()] if viewers_input else []
         
         print("Saving embeddings in ChromaDB...")
@@ -178,11 +139,12 @@ def main() -> None:
     global ACTIVE_USER, FILTERING_MODE
 
     print("\n--- SpiceDB Access Control Setup ---")
-    username = input("Enter your username (default: 'admin'): ").strip()
-    if username:
-        ACTIVE_USER = username
-    else:
-        ACTIVE_USER = "admin"
+    while True:
+        username = input("Enter your username: ").strip()
+        if username:
+            ACTIVE_USER = username
+            break
+        print("Username cannot be empty.")
     print(f"Active user set to: '{ACTIVE_USER}' (Type \\user to change later)")
 
     print("\nSelect Access Control Filtering Mode:")
