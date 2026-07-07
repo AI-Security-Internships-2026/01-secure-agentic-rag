@@ -67,17 +67,19 @@ def add_documents(
 def query_documents(
     collection_name: str,
     query_embedding: List[float],
-    n_results: int = 5
+    n_results: int = 5,
+    where: Dict[str, Any] = None
 ) -> Dict[str, Any]:
     """
-    Queries ChromaDB using a pre-computed query embedding.
+    Queries ChromaDB using a pre-computed query embedding with optional metadata filtering.
     Returns matched documents, metadata, and distances.
     """
     collection = get_or_create_collection(collection_name)
     
     results = collection.query(
         query_embeddings=[query_embedding],
-        n_results=n_results
+        n_results=n_results,
+        where=where
     )
     return results
 

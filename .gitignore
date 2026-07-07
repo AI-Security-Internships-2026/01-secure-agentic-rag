@@ -28,6 +28,7 @@ Thumbs.db
 *.ipynb_metadata
 
 # Datasets and large files (use DVC or document sources in datasets/README.md)
+datasets/
 datasets/**/*.csv
 datasets/**/*.json
 datasets/**/*.parquet
@@ -70,4 +71,4 @@ experiments/results/*.pdf
 # Database
 exported_database.csv
 chroma_db/
-chromadb/
+chromadb/
