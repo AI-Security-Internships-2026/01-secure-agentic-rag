@@ -151,7 +151,7 @@ def get_or_upload_collection() -> str:
                 if col_names and 1 <= val <= len(col_names):
                     selected_col = col_names[val - 1]
                     print(f"\nUsing existing collection: '{selected_col}'")
-                    register_default_permissions(selected_col)
+                    # Permissions are already stored in SpiceDB during upload.
                     return selected_col
                 elif val == len(col_names) + 1 or (not col_names and val == 1):
                     pdf_path = prompt_for_pdf()
