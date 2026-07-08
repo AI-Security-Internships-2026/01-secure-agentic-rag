@@ -158,17 +158,23 @@ def query_rag_system(
     """
     End-to-end function to retrieve context and answer user query.
     """
+    from data_functions.load_document import get_analyzer_and_anonymizer
+    analyzer, anonymizer = get_analyzer_and_anonymizer()
+    results = analyzer.analyze(text=query, language="en")
+    anonymized_query = anonymizer.anonymize(text=query, analyzer_results=results).text
+
     contexts, diagnostics = retrieve_context(
         collection_name, 
-        query, 
+        anonymized_query, 
         n_results=n_results, 
         user_id=user_id, 
         filtering_mode=filtering_mode
     )
-    answer = answer_query(query, contexts)
+    answer = answer_query(anonymized_query, contexts)
     return {
         "answer": answer,
         "contexts": contexts,
-        "diagnostics": diagnostics
+        "diagnostics": diagnostics,
+        "anonymized_query": anonymized_query
     }
 

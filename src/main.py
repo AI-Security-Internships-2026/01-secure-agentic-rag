@@ -227,7 +227,9 @@ def main() -> None:
                 filtering_mode=FILTERING_MODE
             )
             
-            print("\nAnswer:")
+            print(f"\nAnswer:")
+            if result.get("anonymized_query") and result["anonymized_query"] != query:
+                print(f"[Anonymized Query Used: '{result['anonymized_query']}']")
             print(result["answer"])
             
             # Print security diagnostics
