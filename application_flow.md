@@ -43,9 +43,24 @@ When a user opts to upload a new PDF document, the `index_new_pdf` workflow is t
 
 ---
 
-## 3. Query & Access Control Flow
+## 3. Query & Security Guardrails Flow (LCEL)
 
-When the user enters a query, the system evaluates their access rights before providing an answer. This behaves differently depending on the chosen **Filtering Mode**.
+When the user enters a query, it is processed through a strict LangChain Expression Language (LCEL) pipeline designed to enforce multiple layers of security before and after retrieving data.
+
+### The LCEL Guardrails Pipeline
+The end-to-end query execution follows these chained Runnables:
+1. **Input PII Guardrail**: Intercepts the raw user query and uses Microsoft Presidio to redact sensitive data (emails, phones) before any processing.
+2. **Prompt Injection Guardrail**: An LLM strictly evaluates the anonymized query for jailbreaks or malicious instructions. If detected, execution halts immediately.
+3. **Context Retrieval**: The system evaluates access rights (via SpiceDB) and fetches semantic matches (via ChromaDB). (See *Access Control Mechanisms* below).
+4. **LLM Generation**: Generates the baseline answer securely using only the authorized context.
+5. **Output Relevance Guardrail**: An evaluator LLM checks if the generated answer is fully grounded in the retrieved context to prevent hallucination.
+6. **Output PII Guardrail**: The final answer is passed through the Presidio Anonymizer to scrub any sensitive data before presenting to the user.
+
+---
+
+## 4. Access Control Mechanisms (Retrieval Phase)
+
+The Context Retrieval step behaves differently depending on the chosen **Filtering Mode**.
 
 ### SpiceDB Schema Context
 The entire permission system evaluates against this schema:
@@ -92,7 +107,7 @@ definition chunk {
 
 ---
 
-## 4. Response Generation & Transparency
+## 5. Response Generation & Transparency
 
 Once the secure context (authorized chunks) is constructed, the prompt is sent to the LLM. The application then displays:
 - The generated **Answer**.
