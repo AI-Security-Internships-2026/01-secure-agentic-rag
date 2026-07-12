@@ -82,6 +82,33 @@ Reading papers were a problem for me. I wasn't sure about what to read. And as a
 - Encountered eventual consistency latency issues in test check permissions which was resolved by enforcing full consistency on read requests.
 
 ### Next week plan
+- Integrate PII detection and masking.
+- Implement comprehensive LLM guardrails (prompt injection, hallucination).
+- Refactor the querying pipeline using LangChain.
+
+---
+
+## Week 4
+
+**Branch:** `taha-week-04`
+**PR link:** _[Add link after opening PR]_
+
+### Completed this week
+- Implemented Microsoft Presidio to automatically detect and mask PII (e.g., email addresses, phone numbers) to secure queries before they are sent to the embedding and LLM APIs.
+- Re-architected the query processing pipeline in `query_engine.py` using LangChain Expression Language (LCEL).
+- Developed and integrated 4 robust security guardrails into the new LCEL pipeline:
+  1. **Input PII Guardrail** (Presidio-based query masking)
+  2. **Prompt Injection Guardrail** (LLM-based detection of malicious instructions/jailbreaks)
+  3. **Output Relevance Guardrail** (LLM-based validation to detect and block hallucinations)
+  4. **Output PII Guardrail** (Presidio-based final output scrubbing)
+- Updated `application_flow.md` to formally document the new LCEL Security Guardrails Pipeline.
+
+### Problems / Blockers
+- Encountered a runtime error (`Argument 'string' has incorrect type (expected str, got TextAccessor)`) when passing LangChain's `StrOutputParser` output to the Presidio Analyzer. Resolved this by explicitly casting the LCEL chain outputs to native Python `str` types before passing them to the spacy-based Presidio engines.
+
+### Next week plan
+- Finalize evaluation of the prototype on benchmark datasets.
+- Write and format the final technical report.
 
 ---
 
