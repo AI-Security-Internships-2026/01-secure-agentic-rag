@@ -76,26 +76,107 @@ Friday     – Open weekly Pull Request from your branch → dev
 
 ## Getting Started
 
+### 1. Prerequisites
+Ensure you have the following installed on your machine:
+- **Python 3.10+**
+- **Docker Desktop** (with compose enabled)
+- **API Keys**:
+  - A [Groq API Key](https://console.groq.com/) for LLM generation, guardrails, and evaluations.
+  - A [Google Gemini API Key](https://aistudio.google.com/) for generating document embeddings.
+
+---
+
+### 2. Clone the Repository
 ```bash
-# 1. Clone the repository
 git clone https://github.com/AI-Security-Internships-2026/01-secure-agentic-rag.git
 cd 01-secure-agentic-rag
+```
 
-# 2. Create and activate a virtual environment
+---
+
+### 3. Environment Configuration
+Create a `.env` file in the root directory by copying the template:
+```bash
+cp .env.example .env
+```
+Open `.env` and fill in your keys and configuration details:
+```env
+# LLM Providers
+GROQ_API_KEY=gsk_...
+GROQ_MODEL=llama-3.1-8b-instant
+GOOGLE_API_KEY=AIzaSy...
+
+# SpiceDB (Authzed) Configuration
+SPICEDB_ENDPOINT=localhost:50051
+SPICEDB_PRESHARED_KEY=foobar
+```
+
+---
+
+### 4. Launch Local Services (Docker Compose)
+Start the PostgreSQL metadata store and Authzed SpiceDB permission engine locally:
+```bash
+# Start all required backend services in the background
+docker compose up -d
+```
+Verify that the `spicedb` and `postgres` containers are running healthily before continuing.
+
+---
+
+### 5. Setup Python Virtual Environment
+```bash
+# Create a virtual environment
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
-# 3. Install dependencies
+# Activate the virtual environment
+# On Linux/macOS:
+source .venv/bin/activate
+# On Windows (Command Prompt):
+.venv\Scripts\activate.bat
+# On Windows (PowerShell):
+.venv\Scripts\Activate.ps1
+
+# Install project dependencies
 pip install -r requirements.txt
 
-# 4. Create your weekly branch
-git checkout dev
-git pull origin dev
-git checkout -b your-name-week-01
+# Download the lightweight NLP model required for Presidio PII guardrails
+python -m spacy download en_core_web_sm
+```
 
-# 5. Run the starter script
+---
+
+### 6. Run the Interactive CLI Application
+Start the interactive RAG console:
+```bash
 python src/main.py
 ```
+#### Interactive CLI Walkthrough:
+1. **Enter Username**: Input your active user (e.g., `taha`, `admin`, `alice`).
+2. **Select Access Control Filtering Mode**:
+   - `[1]` **NONE**: No access check. Global search.
+   - `[2]` **PRE**: Fetches allowed document IDs from SpiceDB first, then filters ChromaDB vector search.
+   - `[3]` **POST**: Searches ChromaDB globally, then runs SpiceDB checks on each retrieved chunk, discarding unauthorized ones.
+3. **Choose Document**: Select an existing indexed collection or choose the option to index/upload a new PDF document.
+4. **Interactive Prompt Commands**:
+   - Type `\user` to switch the active session user.
+   - Type `\mode` to toggle between filtering modes on the fly.
+   - Type `\change` to switch document databases.
+   - Type `\spicedb` to print currently indexed simulator permissions.
+   - Type `exit` to quit the session.
+
+---
+
+### 7. Run Automated Test Suites
+To verify schema operations, database permissions, agent retry loops, and injection mitigations:
+
+- **Run SpiceDB Access Control Tests**:
+  ```bash
+  python -m unittest tests/test_spicedb.py
+  ```
+- **Run LangGraph Query Engine Loop & Injection Mitigation Tests**:
+  ```bash
+  python -m unittest tests/test_query_engine.py
+  ```
 
 ---
 
