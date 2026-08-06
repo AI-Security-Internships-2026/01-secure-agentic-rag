@@ -112,5 +112,62 @@ Reading papers were a problem for me. I wasn't sure about what to read. And as a
 
 ---
 
-_(Add a new section each week)_
+## Week 5
+
+**Branch:** `taha-week-05`
+**PR link:** _[Add link after opening PR]_
+
+### Completed this week
+- Finalized initial evaluation of the prototype on benchmark datasets.
+- Drafted and formatted the initial version of the final technical report.
+
+### Problems / Blockers
+- Had some initial variance in benchmark scores which was solved by setting the LLM temperature strictly to 0.
+
+### Next week plan
+- Clean up configuration setup and resolve Docker compose environment issues.
+
+---
+
+## Week 6
+
+**Branch:** `taha-week-06`
+**PR link:** _[Add link after opening PR]_
+
+### Completed this week
+- Resolved container startup and connection errors between the SpiceDB migration service (`spicedb-migrate`) and the backend database (`spicedb-postgres`).
+- Cleaned up dependency listings in the virtual environment.
+
+### Problems / Blockers
+- Met minor DNS lookup issues in local Docker desktop on Windows, which was resolved by ensuring the database healthcheck passes before the migration driver attempts connection.
+
+### Next week plan
+- Implement multi-step agent reasoning and loop capabilities.
+
+---
+
+## Week 7
+
+**Branch:** `week-07`
+**PR link:** _[Add link after opening PR]_
+
+### Completed this week
+- Replaced the single-shot retrieval-generation LCEL chain in `query_engine.py` with a stateful **multi-step agent loop** using **LangGraph**.
+- Added the following nodes in the LangGraph StateGraph:
+  1. `guard_input`: Runs PII masking and prompt injection checks.
+  2. `retrieve`: Vector search retrieval.
+  3. `verify_and_rerank`: LLM-based chunk relevance evaluation, filtering, and score-based re-ranking.
+  4. `rewrite_query`: Rewrites user query if no relevant context is verified, looping back to retrieval (max 2 steps).
+  5. `generate`: Generates response from verified context.
+  6. `guard_output`: Hallucination/groundedness validation and PII output anonymization.
+- Optimized Presidio Analyzer initialization by explicitly loading the lightweight `en_core_web_sm` spaCy model (12MB) instead of the extremely heavy `en_core_web_lg` model (400MB).
+- Refactored `tests/test_query_engine.py` to support LangGraph execution flows and mock `AIMessage` schemas.
+- Updated `application_flow.md` to formally document the LangGraph Agent Loop workflow.
+
+### Problems / Blockers
+- Experienced validation failures in Pydantic during LLM mocking because of LangChain wrapping the mock in a callable `RunnableLambda` function. Resolved this by setting mock `side_effect` directly on the mock instance callable and using native `AIMessage` objects for return values.
+- Slow network connection speed on the local machine made downloading the 400MB spaCy model impractical, which was resolved by switching to the 12.8MB lightweight model.
+
+### Next week plan
+- Prepare final project delivery.
 
