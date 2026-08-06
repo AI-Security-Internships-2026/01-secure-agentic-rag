@@ -132,8 +132,17 @@ def get_analyzer_and_anonymizer():
     if _analyzer is None:
         try:
             from presidio_analyzer import AnalyzerEngine
+            from presidio_analyzer.nlp_engine import NlpEngineProvider
             from presidio_anonymizer import AnonymizerEngine
-            _analyzer = AnalyzerEngine()
+            
+            # Configure NLP engine to use en_core_web_sm
+            provider = NlpEngineProvider(nlp_configuration={
+                "nlp_engine_name": "spacy",
+                "models": [{"lang_code": "en", "model_name": "en_core_web_sm"}]
+            })
+            nlp_engine = provider.create_engine()
+            
+            _analyzer = AnalyzerEngine(nlp_engine=nlp_engine)
             _anonymizer = AnonymizerEngine()
             
             # Register custom recognizers configured from environment variables
@@ -141,7 +150,7 @@ def get_analyzer_and_anonymizer():
 
         except Exception as e:
             print(f"Error initializing Presidio engines: {e}")
-            print("Please ensure you have downloaded the required spaCy model (e.g., run `python -m spacy download en_core_web_lg`).")
+            print("Please ensure you have downloaded the required spaCy model (e.g., run `python -m spacy download en_core_web_sm`).")
             raise e
     return _analyzer, _anonymizer
 

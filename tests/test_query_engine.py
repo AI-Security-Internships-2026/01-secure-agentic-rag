@@ -6,7 +6,8 @@ import sys
 # Add src to the path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
-from data_functions.query_engine import retrieve_context, answer_query, query_rag_system
+from langchain_core.messages import AIMessage
+from data_functions.query_engine import retrieve_context, query_rag_system
 
 class TestQueryEngine(unittest.TestCase):
     
@@ -21,49 +22,20 @@ class TestQueryEngine(unittest.TestCase):
             "documents": [["This is a test document snippet about cybersecurity database indexing."]]
         }
         
-        contexts = retrieve_context("test_collection", "What is database indexing?")
+        contexts, _ = retrieve_context("test_collection", "What is database indexing?")
         
         # Verify mocked calls
         mock_embed_content.assert_called_once()
-        mock_query_documents.assert_called_once_with("test_collection", [0.1] * 768, n_results=5)
+        mock_query_documents.assert_called_once_with("test_collection", [0.1] * 768, n_results=5, where=None)
         
         # Verify returned context
         self.assertEqual(len(contexts), 1)
         self.assertEqual(contexts[0], "This is a test document snippet about cybersecurity database indexing.")
 
-    @patch("openai.OpenAI")
-    def test_answer_query(self, mock_openai_class):
-        # Mock OpenAI client instance
-        mock_client = MagicMock()
-        mock_openai_class.return_value = mock_client
-        
-        # Mock chat completions
-        mock_completions = MagicMock()
-        mock_client.chat.completions = mock_completions
-        
-        # Mock return structure choices[0].message.content
-        mock_response = MagicMock()
-        mock_message = MagicMock()
-        mock_message.content = "This is a mocked answer from Groq."
-        mock_choice = MagicMock()
-        mock_choice.message = mock_message
-        mock_response.choices = [mock_choice]
-        mock_completions.create.return_value = mock_response
-        
-        contexts = ["Cybersecurity context details."]
-        answer = answer_query("What are the details?", contexts)
-        
-        # Verify mock instantiation and call
-        mock_openai_class.assert_called_once()
-        mock_completions.create.assert_called_once()
-        
-        # Verify answer content
-        self.assertEqual(answer, "This is a mocked answer from Groq.")
-
     @patch("google.generativeai.embed_content")
     @patch("data_functions.query_engine.query_documents")
-    @patch("openai.OpenAI")
-    def test_query_rag_system(self, mock_openai_class, mock_query_documents, mock_embed_content):
+    @patch("data_functions.query_engine.ChatOpenAI")
+    def test_query_rag_system(self, mock_chat_openai, mock_query_documents, mock_embed_content):
         # Setup mock for embeddings
         mock_embed_content.return_value = {"embedding": [0.1] * 768}
 
@@ -71,26 +43,69 @@ class TestQueryEngine(unittest.TestCase):
             "documents": [["Context chunk 1"]]
         }
         
-        # Setup mock for Groq completions
-        mock_client = MagicMock()
-        mock_openai_class.return_value = mock_client
-        mock_completions = MagicMock()
-        mock_client.chat.completions = mock_completions
+        # Setup ChatOpenAI mock instances and their invoke calls
+        mock_llm_instance = MagicMock()
+        mock_chat_openai.return_value = mock_llm_instance
         
-        mock_response = MagicMock()
-        mock_message = MagicMock()
-        mock_message.content = "Mock answer text from Groq."
-        mock_choice = MagicMock()
-        mock_choice.message = mock_message
-        mock_response.choices = [mock_choice]
-        mock_completions.create.return_value = mock_response
+        msg_safe = AIMessage(content="SAFE")
+        msg_verify = AIMessage(content="Chunk 1:\nRELEVANT: YES\nSCORE: 5\n")
+        msg_gen = AIMessage(content="Mock answer text from Groq.")
+        msg_grounded = AIMessage(content="PASS")
+        
+        mock_llm_instance.side_effect = [
+            msg_safe,      # For injection guardrail
+            msg_verify,    # For relevance evaluation/verification
+            msg_gen,       # For generation
+            msg_grounded   # For groundedness evaluation
+        ]
         
         result = query_rag_system("test_col", "Mock query")
         
-        # Verify results
-        self.assertEqual(result["answer"], "Mock answer text from Groq.")
+        # Verify results (Groq is anonymized to <LOCATION> by the output PII guardrail)
+        self.assertEqual(result["answer"], "Mock answer text from <LOCATION>.")
         self.assertEqual(result["contexts"], ["Context chunk 1"])
+
+    @patch("google.generativeai.embed_content")
+    @patch("data_functions.query_engine.query_documents")
+    @patch("data_functions.query_engine.ChatOpenAI")
+    def test_query_rag_system_with_rewrite(self, mock_chat_openai, mock_query_documents, mock_embed_content):
+        # Mock embed_content
+        mock_embed_content.return_value = {"embedding": [0.1] * 768}
+        
+        # First query_documents returns no documents, then second returns documents
+        mock_query_documents.side_effect = [
+            {"documents": [["Context chunk 1"]]},
+            {"documents": [["Context chunk 2"]]}
+        ]
+        
+        mock_llm_instance = MagicMock()
+        mock_chat_openai.return_value = mock_llm_instance
+        
+        # Setup side effect responses
+        msg_safe = AIMessage(content="SAFE")
+        msg_verify_fail = AIMessage(content="Chunk 1:\nRELEVANT: NO\nSCORE: 1\n")
+        msg_rewrite = AIMessage(content="New reformulated query")
+        msg_verify_pass = AIMessage(content="Chunk 1:\nRELEVANT: YES\nSCORE: 5\n")
+        msg_gen = AIMessage(content="Answer based on context 2.")
+        msg_grounded = AIMessage(content="PASS")
+        
+        mock_llm_instance.side_effect = [
+            msg_safe,          # guard_input (injection)
+            msg_verify_fail,   # verify_and_rerank (Chunk 1 marked irrelevant)
+            msg_rewrite,       # rewrite_query
+            msg_verify_pass,   # verify_and_rerank (Chunk 2 marked relevant)
+            msg_gen,           # generate
+            msg_grounded       # guard_output (groundedness)
+        ]
+        
+        result = query_rag_system("test_col", "Mock query")
+        
+        # "Answer" is anonymized to <ORGANIZATION> by the output PII guardrail
+        self.assertEqual(result["answer"], "<ORGANIZATION> based on context 2.")
+        self.assertEqual(result["contexts"], ["Context chunk 2"])
+        self.assertEqual(result["anonymized_query"], "New reformulated query")
 
 
 if __name__ == "__main__":
     unittest.main()
+
