@@ -115,7 +115,7 @@ def retrieve_context(
 
 
 
-# --- LCEL Guardrails & Pipeline ---
+# --- LCEL Guardrail Helpers ---
 
 def _pii_input_guardrail(inputs: dict) -> dict:
     query = inputs["query"]
@@ -216,6 +216,199 @@ def _pii_output_guardrail(inputs: dict) -> dict:
     inputs["answer"] = anonymizer.anonymize(text=answer, analyzer_results=results).text
     return inputs
 
+
+# --- LangGraph Agent Loop Definition ---
+
+from typing import TypedDict, List, Dict, Any
+from langgraph.graph import StateGraph, END
+import re
+
+class AgentState(TypedDict):
+    collection_name: str
+    query: str
+    anonymized_query: str
+    n_results: int
+    user_id: str
+    filtering_mode: str
+    contexts: List[str]
+    answer: str
+    diagnostics: Dict[str, Any]
+    loop_step: int
+    max_steps: int
+
+def guard_input(state: AgentState) -> dict:
+    inputs = {"query": state["query"]}
+    inputs = _pii_input_guardrail(inputs)
+    inputs = _injection_guardrail(inputs)
+    return {
+        "anonymized_query": inputs["anonymized_query"]
+    }
+
+def retrieve_context_node(state: AgentState) -> dict:
+    inputs = {
+        "collection_name": state["collection_name"],
+        "anonymized_query": state["anonymized_query"],
+        "n_results": state.get("n_results", 5),
+        "user_id": state.get("user_id", "admin"),
+        "filtering_mode": state.get("filtering_mode", "none")
+    }
+    inputs = _retrieve_context_runnable(inputs)
+    return {
+        "contexts": inputs["contexts"],
+        "diagnostics": inputs["diagnostics"]
+    }
+
+def verify_and_rerank(state: AgentState) -> dict:
+    contexts = state.get("contexts", [])
+    if not contexts:
+        return {
+            "contexts": [],
+            "loop_step": state.get("loop_step", 0) + 1
+        }
+
+    llm = ChatOpenAI(
+        api_key=os.getenv("GROQ_API_KEY"), 
+        base_url="https://api.groq.com/openai/v1", 
+        model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+        temperature=0.0
+    )
+    
+    chunks_text = "\n\n".join([f"--- Chunk {i+1} ---\n{chunk}" for i, chunk in enumerate(contexts)])
+    
+    prompt = PromptTemplate.from_template(
+        "You are an evaluator AI. You are given a user query and a list of retrieved document chunks.\n"
+        "For each chunk, determine if it contains relevant information to answer the query, "
+        "and assign a relevance score from 1 to 5 (5 being extremely relevant, 1 being irrelevant).\n\n"
+        "User query: {query}\n\n"
+        "Retrieved chunks:\n{chunks_text}\n\n"
+        "Respond in the following format for each chunk (e.g. Chunk 1, Chunk 2):\n"
+        "Chunk [number]:\n"
+        "RELEVANT: <YES or NO>\n"
+        "SCORE: <1 to 5>\n"
+    )
+    
+    chain = prompt | llm | StrOutputParser()
+    try:
+        response_text = str(chain.invoke({
+            "query": state["anonymized_query"],
+            "chunks_text": chunks_text
+        })).strip()
+    except Exception as e:
+        print(f"\n[Agent Loop] Error during relevance evaluation: {e}. Falling back to default relevance.")
+        return {
+            "contexts": contexts,
+            "loop_step": state.get("loop_step", 0) + 1
+        }
+    
+    parsed_results = []
+    for i in range(len(contexts)):
+        pattern = rf"Chunk\s*{i+1}\b(?:(?!Chunk\s*\d+\b).)*?RELEVANT:\s*(YES|NO).*?SCORE:\s*([1-5])"
+        match = re.search(pattern, response_text, re.IGNORECASE | re.DOTALL)
+        if match:
+            is_relevant = match.group(1).upper() == "YES"
+            score = int(match.group(2))
+            parsed_results.append((i, is_relevant, score))
+        else:
+            parsed_results.append((i, True, 3))
+            
+    verified_with_scores = []
+    for idx, is_relevant, score in parsed_results:
+        if is_relevant and score >= 3:
+            verified_with_scores.append((contexts[idx], score))
+            
+    verified_with_scores.sort(key=lambda x: x[1], reverse=True)
+    sorted_contexts = [item[0] for item in verified_with_scores]
+    
+    print(f"\n[Agent Loop] Verification results:")
+    for idx, (chunk, score) in enumerate(verified_with_scores):
+        snippet = chunk.replace('\n', ' ')[:60] + "..."
+        print(f"  - Verified Chunk {idx+1}: Score {score}/5 | {snippet}")
+        
+    return {
+        "contexts": sorted_contexts,
+        "loop_step": state.get("loop_step", 0) + 1
+    }
+
+def rewrite_query(state: AgentState) -> dict:
+    llm = ChatOpenAI(
+        api_key=os.getenv("GROQ_API_KEY"), 
+        base_url="https://api.groq.com/openai/v1", 
+        model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+        temperature=0.0
+    )
+    prompt = PromptTemplate.from_template(
+        "You are an AI assistant designed to reformulate search queries for a vector database. "
+        "The previous search query returned no relevant document chunks. "
+        "Analyze the original query and reformulate it to improve semantic search retrieval.\n\n"
+        "Original query: {query}\n\n"
+        "Output ONLY the new reformulated query string, without any introduction, explanations, or quotes."
+    )
+    chain = prompt | llm | StrOutputParser()
+    new_query = str(chain.invoke({"query": state["anonymized_query"]})).strip()
+    
+    print(f"\n[Agent Loop] Reformulating query: '{state['anonymized_query']}' -> '{new_query}'")
+    return {
+        "anonymized_query": new_query
+    }
+
+def generate_answer(state: AgentState) -> dict:
+    inputs = {
+        "contexts": state["contexts"],
+        "anonymized_query": state["anonymized_query"]
+    }
+    inputs = _generate_answer_runnable(inputs)
+    return {
+        "answer": inputs["answer"]
+    }
+
+def guard_output(state: AgentState) -> dict:
+    inputs = {
+        "answer": state["answer"],
+        "contexts": state["contexts"]
+    }
+    inputs = _relevance_guardrail(inputs)
+    inputs = _pii_output_guardrail(inputs)
+    return {
+        "answer": inputs["answer"]
+    }
+
+def route_after_verification(state: AgentState) -> str:
+    if state["contexts"]:
+        print(f"\n[Agent Loop] Found {len(state['contexts'])} relevant contexts. Routing to generation.")
+        return "generate"
+    if state.get("loop_step", 0) < state.get("max_steps", 2):
+        print(f"\n[Agent Loop] No relevant contexts found. Step {state['loop_step']}/{state['max_steps']}. Routing to query rewriting.")
+        return "rewrite_query"
+    print(f"\n[Agent Loop] No relevant contexts found and max retries reached. Routing to generation.")
+    return "generate"
+
+# Build state graph workflow
+workflow = StateGraph(AgentState)
+workflow.add_node("guard_input", guard_input)
+workflow.add_node("retrieve", retrieve_context_node)
+workflow.add_node("verify_and_rerank", verify_and_rerank)
+workflow.add_node("rewrite_query", rewrite_query)
+workflow.add_node("generate", generate_answer)
+workflow.add_node("guard_output", guard_output)
+
+workflow.set_entry_point("guard_input")
+workflow.add_edge("guard_input", "retrieve")
+workflow.add_edge("retrieve", "verify_and_rerank")
+workflow.add_conditional_edges(
+    "verify_and_rerank",
+    route_after_verification,
+    {
+        "generate": "generate",
+        "rewrite_query": "rewrite_query"
+    }
+)
+workflow.add_edge("rewrite_query", "retrieve")
+workflow.add_edge("generate", "guard_output")
+workflow.add_edge("guard_output", END)
+
+app = workflow.compile()
+
+
 def query_rag_system(
     collection_name: str, 
     query: str, 
@@ -224,28 +417,24 @@ def query_rag_system(
     filtering_mode: str = "none"
 ) -> dict:
     """
-    End-to-end LCEL function to retrieve context and answer user query securely.
+    End-to-end LangGraph agent loop to retrieve, verify/re-rank context, and answer query securely.
     """
-    inputs = {
+    initial_state = {
         "collection_name": collection_name,
         "query": query,
+        "anonymized_query": query,
         "n_results": n_results,
         "user_id": user_id,
-        "filtering_mode": filtering_mode
+        "filtering_mode": filtering_mode,
+        "contexts": [],
+        "answer": "",
+        "diagnostics": {},
+        "loop_step": 0,
+        "max_steps": 2
     }
     
-    # Define the LCEL pipeline
-    chain = (
-        RunnableLambda(_pii_input_guardrail)
-        | RunnableLambda(_injection_guardrail)
-        | RunnableLambda(_retrieve_context_runnable)
-        | RunnableLambda(_generate_answer_runnable)
-        | RunnableLambda(_relevance_guardrail)
-        | RunnableLambda(_pii_output_guardrail)
-    )
-    
     try:
-        final_state = chain.invoke(inputs)
+        final_state = app.invoke(initial_state)
         return {
             "answer": final_state["answer"],
             "contexts": final_state["contexts"],
@@ -253,7 +442,6 @@ def query_rag_system(
             "anonymized_query": final_state.get("anonymized_query", query)
         }
     except ValueError as e:
-        # Caught an injection or other hard security block
         return {
             "answer": str(e),
             "contexts": [],

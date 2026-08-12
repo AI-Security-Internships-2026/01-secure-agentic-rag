@@ -43,18 +43,29 @@ When a user opts to upload a new PDF document, the `index_new_pdf` workflow is t
 
 ---
 
-## 3. Query & Security Guardrails Flow (LCEL)
+## 3. Query & Security Guardrails Flow (LangGraph Agent Loop)
 
-When the user enters a query, it is processed through a strict LangChain Expression Language (LCEL) pipeline designed to enforce multiple layers of security before and after retrieving data.
+When the user enters a query, it is processed through a stateful multi-step agent loop using **LangGraph** designed to enforce multiple layers of security, verify context relevance, and dynamically retry queries:
 
-### The LCEL Guardrails Pipeline
-The end-to-end query execution follows these chained Runnables:
-1. **Input PII Guardrail**: Intercepts the raw user query and uses Microsoft Presidio to redact sensitive data (emails, phones) before any processing.
-2. **Prompt Injection Guardrail**: An LLM strictly evaluates the anonymized query for jailbreaks or malicious instructions. If detected, execution halts immediately.
-3. **Context Retrieval**: The system evaluates access rights (via SpiceDB) and fetches semantic matches (via ChromaDB). (See *Access Control Mechanisms* below).
-4. **LLM Generation**: Generates the baseline answer securely using only the authorized context.
-5. **Output Relevance Guardrail**: An evaluator LLM checks if the generated answer is fully grounded in the retrieved context to prevent hallucination.
-6. **Output PII Guardrail**: The final answer is passed through the Presidio Anonymizer to scrub any sensitive data before presenting to the user.
+### The LangGraph Agent Loop Workflow
+The workflow transitions through the following nodes based on state and conditional routing logic:
+1. **Input Guardrails (`guard_input` node)**:
+   - **PII Scrubbing**: Sanitizes sensitive user query details (like email addresses and phone numbers) using Microsoft Presidio.
+   - **Prompt Injection Prevention**: Uses a security LLM to evaluate the anonymized query for jailbreak attempts or malicious commands.
+2. **Context Retrieval (`retrieve` node)**:
+   - Evaluates access rights (via SpiceDB) and fetches semantic matches (via ChromaDB). (See *Access Control Mechanisms* below).
+3. **Verification & Re-ranking (`verify_and_rerank` node)**:
+   - An evaluator LLM grades the relevance of each retrieved text chunk.
+   - Irrelevant chunks (scoring $< 3/5$ or flagged as irrelevant) are discarded.
+   - The remaining verified chunks are re-ranked in descending order of relevance.
+4. **Conditional Retry / Query Rewriting (`rewrite_query` node)**:
+   - If no relevant contexts remain after verification, the query is passed to a reformulation node.
+   - An LLM rewrites the query to improve semantic search matching, and loops back to **Context Retrieval** (up to 2 retry attempts).
+5. **Answer Generation (`generate` node)**:
+   - Formulates the final response using only the verified and ranked context chunks.
+6. **Output Guardrails (`guard_output` node)**:
+   - **Groundedness Check**: Validates that the answer is fully grounded in the retrieved chunks, blocking hallucinations.
+   - **PII Anonymization**: Scrubs any sensitive info from the final answer before presenting to the user.
 
 ---
 
