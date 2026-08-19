@@ -40,6 +40,12 @@ Python, LangChain, OpenAI API, ChromaDB, FastAPI, Docker
 
 See `requirements.txt` for pinned dependencies.
 
+## Security evaluations
+
+- [`docs/guardrail-comparison.md`](docs/guardrail-comparison.md) explains the prompt-injection and PII/secret guardrail benchmark.
+- [`docs/indirect-injection-evaluation.md`](docs/indirect-injection-evaluation.md) explains the poisoned-context ASR evaluation and why it bypasses ChromaDB.
+- [`docs/threat_model.md`](docs/threat_model.md) defines the indirect prompt-injection threat model.
+
 ---
 
 ## Weekly Workflow

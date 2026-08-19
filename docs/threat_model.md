@@ -137,3 +137,5 @@ python experiments/run_indirect_injection_eval.py
 ```
 
 Results: `experiments/results/indirect_injection_eval.json`.
+
+The separate guardrail classification benchmark is documented in [`docs/guardrail-comparison.md`](guardrail-comparison.md). It evaluates direct prompt-injection and PII/secret checks on labeled text samples and is intentionally independent of ChromaDB retrieval.

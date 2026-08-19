@@ -148,6 +148,20 @@ API errors are excluded from the denominator so a failed HTTP call cannot look l
 
 ---
 
+### Task E — Guardrail comparison benchmark (19 Aug)
+
+**Goal.** Compare the repository's prompt-injection and PII controls with representative LLM prompt and local validator patterns on labeled samples.
+
+**How it was executed.** `experiments/run_guardrail_comparison.py` evaluates 20 prompt-injection samples and 20 PII/secret samples. It calls the configured OpenAI-compatible LLM endpoint for the repository, NeMo-style, and Meta-style prompt-injection predictors. Presidio runs locally for the repository PII check, and the validator comparison uses local regular expressions.
+
+The benchmark does not use ChromaDB because it tests classification and sanitization directly, not embedding retrieval or document ranking. The NeMo, Meta, and Guardrails AI entries are representative prompt/validator patterns in this script, not claims that the full external frameworks or separate models were installed and executed.
+
+It records true/false positives and negatives, precision, recall, F1, false-positive and false-negative rates, median and p95 latency, throughput, and failures.
+
+**Products.** [`experiments/run_guardrail_comparison.py`](../experiments/run_guardrail_comparison.py), [`experiments/results/guardrail_comparison.json`](../experiments/results/guardrail_comparison.json), and [`docs/guardrail-comparison.md`](guardrail-comparison.md).
+
+---
+
 ## 3. Products (files created or updated)
 
 | File | Role |
@@ -159,6 +173,10 @@ API errors are excluded from the denominator so a failed HTTP call cannot look l
 | `experiments/datasets/adversarial_indirect_injection.json` | Poisoned vs clean set |
 | `experiments/run_indirect_injection_eval.py` | Before/after ASR runner |
 | `experiments/results/indirect_injection_eval.json` | Machine-readable scores and answer previews |
+| `experiments/run_guardrail_comparison.py` | Guardrail classification benchmark runner |
+| `experiments/results/guardrail_comparison.json` | Guardrail benchmark metrics |
+| `docs/guardrail-comparison.md` | Guardrail benchmark explanation |
+| `docs/indirect-injection-evaluation.md` | Indirect-injection evaluation explanation |
 | `tests/test_indirect_injection.py` | Offline tests for the first mitigation |
 | `application_flow.md`, `README.md` | Flow + how to reproduce |
 

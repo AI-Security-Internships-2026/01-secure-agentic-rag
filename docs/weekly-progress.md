@@ -182,10 +182,13 @@ Reading papers were a problem for me. I wasn't sure about what to read. And as a
 - Defined the retrieval / indirect prompt injection threat model in `docs/threat_model.md` (trust boundary at retrieved chunks, assets, adversary, attack patterns, eval protocol).
 - Implemented the first mitigation in `query_engine.py`: local regex heuristic to drop poisoned chunks, XML context isolation, Groq scanner as a second layer; both layers are toggleable for ablation.
 - Built a poisoned vs clean adversarial set (`experiments/datasets/adversarial_indirect_injection.json`) and an online-only ASR eval (`experiments/run_indirect_injection_eval.py`) that uses Groq over HTTPS — no extra local model installs.
+- Ran the guardrail comparison benchmark (`experiments/run_guardrail_comparison.py`) for prompt-injection classification and PII/secret detection, measuring precision, recall, F1, error rates, latency, and throughput.
+- Documented both evaluations separately in [`docs/guardrail-comparison.md`](guardrail-comparison.md) and [`docs/indirect-injection-evaluation.md`](indirect-injection-evaluation.md), including their datasets, execution paths, scoring, and limitations.
 - Wrote a full execution-and-results log: [`docs/task-execution-summary.md`](task-execution-summary.md) (how each task was run, files produced, ASR 60% → 0%).
 
 ### Problems / Blockers
 - Local GPU/NLP downloads are impractical on this machine, so the eval path avoids Chroma, embeddings, spaCy, and Presidio and only calls Groq.
+- The guardrail benchmark compares representative prompt and validator patterns; its labels should not be read as a full implementation comparison of the external NeMo, Llama Guard, or Guardrails AI products.
 
 ### Next week plan
 - Ablation of agent loop vs defenses (accuracy and robustness).
