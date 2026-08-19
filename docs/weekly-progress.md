@@ -171,3 +171,22 @@ Reading papers were a problem for me. I wasn't sure about what to read. And as a
 ### Next week plan
 - Prepare final project delivery.
 
+---
+
+## Week 8
+
+**Branch:** current working tree
+**PR link:** _[Add link after opening PR]_
+
+### Completed this week
+- Defined the retrieval / indirect prompt injection threat model in `docs/threat_model.md` (trust boundary at retrieved chunks, assets, adversary, attack patterns, eval protocol).
+- Implemented the first mitigation in `query_engine.py`: local regex heuristic to drop poisoned chunks, XML context isolation, Groq scanner as a second layer; both layers are toggleable for ablation.
+- Built a poisoned vs clean adversarial set (`experiments/datasets/adversarial_indirect_injection.json`) and an online-only ASR eval (`experiments/run_indirect_injection_eval.py`) that uses Groq over HTTPS — no extra local model installs.
+- Wrote a full execution-and-results log: [`docs/task-execution-summary.md`](task-execution-summary.md) (how each task was run, files produced, ASR 60% → 0%).
+
+### Problems / Blockers
+- Local GPU/NLP downloads are impractical on this machine, so the eval path avoids Chroma, embeddings, spaCy, and Presidio and only calls Groq.
+
+### Next week plan
+- Ablation of agent loop vs defenses (accuracy and robustness).
+

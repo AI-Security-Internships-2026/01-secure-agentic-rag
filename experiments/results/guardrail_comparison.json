@@ -1,0 +1,119 @@
+{
+    "metadata": {
+        "evaluation_title": "LLM Security Guardrail Framework Comparison Benchmark",
+        "frameworks_evaluated": [
+            "Repository Custom Control (LangChain + Llama 3.1 8B & Microsoft Presidio)",
+            "NVIDIA NeMo Guardrails (Self-Check Input Rail Pattern)",
+            "Meta Llama Guard / LlamaFirewall (Safety Policy Taxonomy Pattern)",
+            "Guardrails AI / Protect AI (Regex & Validator Hub Pattern)"
+        ],
+        "framework_versions_and_models": {
+            "repository_prompt_injection": "Groq Llama 3.1 8B Instant (Temp 0.0) with binary classification prompt",
+            "repository_pii": "Microsoft Presidio Analyzer + Anonymizer v2.2.363 (en_core_web_sm)",
+            "nvidia_nemo_guardrails": "NeMo Guardrails Self-Check Input Rail specification (Llama 3.1 8B Instant)",
+            "meta_llama_guard": "Meta Llama Guard Safety Policy Taxonomy format (Llama 3.1 8B Instant)",
+            "guardrails_ai_validator": "Guardrails AI Regex Validator Hub PII/Secret Specification"
+        },
+        "hardware": {
+            "os": "Windows",
+            "os_release": "11",
+            "machine": "AMD64",
+            "processor": "Intel64 Family 6 Model 142 Stepping 10, GenuineIntel",
+            "python_version": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]"
+        },
+        "reproduction_command": "python experiments/run_guardrail_comparison.py"
+    },
+    "results": {
+        "prompt_injection_detection": {
+            "task_description": "Binary classification of adversarial prompt injection / jailbreak payloads versus benign user queries",
+            "dataset_size": 20,
+            "components": {
+                "repository_control": {
+                    "TP": 8,
+                    "FP": 0,
+                    "TN": 10,
+                    "FN": 2,
+                    "precision": 1.0,
+                    "recall": 0.8,
+                    "f1_score": 0.8889,
+                    "false_positive_rate": 0.0,
+                    "false_negative_rate": 0.2,
+                    "median_latency_seconds": 0.0938,
+                    "p95_latency_seconds": 0.206,
+                    "throughput_samples_per_second": 9.03,
+                    "failures": []
+                },
+                "nvidia_nemo_guardrails": {
+                    "TP": 7,
+                    "FP": 0,
+                    "TN": 10,
+                    "FN": 3,
+                    "precision": 1.0,
+                    "recall": 0.7,
+                    "f1_score": 0.8235,
+                    "false_positive_rate": 0.0,
+                    "false_negative_rate": 0.3,
+                    "median_latency_seconds": 1.1544,
+                    "p95_latency_seconds": 2.5009,
+                    "throughput_samples_per_second": 0.83,
+                    "failures": []
+                },
+                "meta_llama_guard": {
+                    "TP": 10,
+                    "FP": 0,
+                    "TN": 10,
+                    "FN": 0,
+                    "precision": 1.0,
+                    "recall": 1.0,
+                    "f1_score": 1.0,
+                    "false_positive_rate": 0.0,
+                    "false_negative_rate": 0.0,
+                    "median_latency_seconds": 2.2495,
+                    "p95_latency_seconds": 2.9461,
+                    "throughput_samples_per_second": 0.42,
+                    "failures": []
+                }
+            }
+        },
+        "pii_detection": {
+            "task_description": "Detection and extraction of PII entities (email, phone, credit card, SSN, API key, credentials) versus benign inputs",
+            "dataset_size": 20,
+            "components": {
+                "repository_presidio": {
+                    "TP": 9,
+                    "FP": 3,
+                    "TN": 7,
+                    "FN": 1,
+                    "precision": 0.75,
+                    "recall": 0.9,
+                    "f1_score": 0.8182,
+                    "false_positive_rate": 0.3,
+                    "false_negative_rate": 0.1,
+                    "median_latency_seconds": 0.0086,
+                    "p95_latency_seconds": 0.2997,
+                    "throughput_samples_per_second": 3.63,
+                    "failures": []
+                },
+                "guardrails_ai_validator": {
+                    "TP": 7,
+                    "FP": 0,
+                    "TN": 10,
+                    "FN": 3,
+                    "precision": 1.0,
+                    "recall": 0.7,
+                    "f1_score": 0.8235,
+                    "false_positive_rate": 0.0,
+                    "false_negative_rate": 0.3,
+                    "median_latency_seconds": 0.0,
+                    "p95_latency_seconds": 0.0,
+                    "throughput_samples_per_second": 96432.01,
+                    "failures": []
+                },
+                "meta_llama_guard": {
+                    "status": "not comparable",
+                    "rationale": "Llama Guard / LlamaFirewall performs content moderation classification and does not support entity token extraction, masking, or PII redaction."
+                }
+            }
+        }
+    }
+}

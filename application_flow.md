@@ -55,7 +55,8 @@ The workflow transitions through the following nodes based on state and conditio
 2. **Context Retrieval (`retrieve` node)**:
    - Evaluates access rights (via SpiceDB) and fetches semantic matches (via ChromaDB). (See *Access Control Mechanisms* below).
 3. **Verification & Re-ranking (`verify_and_rerank` node)**:
-   - An evaluator LLM grades the relevance of each retrieved text chunk.
+   - **Indirect prompt injection filter (first mitigation)**: each retrieved chunk is scanned with a local regex heuristic, then (if needed) a Groq `SAFE`/`INJECTION` classifier. Poisoned chunks are discarded and recorded in diagnostics. See `docs/threat_model.md`.
+   - An evaluator LLM grades the relevance of the remaining chunks.
    - Irrelevant chunks (scoring $< 3/5$ or flagged as irrelevant) are discarded.
    - The remaining verified chunks are re-ranked in descending order of relevance.
 4. **Conditional Retry / Query Rewriting (`rewrite_query` node)**:
@@ -63,6 +64,7 @@ The workflow transitions through the following nodes based on state and conditio
    - An LLM rewrites the query to improve semantic search matching, and loops back to **Context Retrieval** (up to 2 retry attempts).
 5. **Answer Generation (`generate` node)**:
    - Formulates the final response using only the verified and ranked context chunks.
+   - Retrieved text is wrapped in `<context>` tags and treated as passive data (context isolation).
 6. **Output Guardrails (`guard_output` node)**:
    - **Groundedness Check**: Validates that the answer is fully grounded in the retrieved chunks, blocking hallucinations.
    - **PII Anonymization**: Scrubs any sensitive info from the final answer before presenting to the user.
