@@ -28,9 +28,25 @@ from data_functions.query_engine import (  # noqa: E402
 )
 
 
-DATASET_PATH = os.path.join(
-    os.path.dirname(__file__), "datasets", "adversarial_indirect_injection.json"
-)
+def _resolve_dataset_path() -> str:
+    here = os.path.dirname(__file__)
+    candidates = [
+        os.path.join(here, "adversarial_indirect_injection.json"),
+        os.path.join(here, "datasets", "adversarial_indirect_injection.json"),
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            return path
+    raise FileNotFoundError(
+        "Missing adversarial eval dataset. Create it with:\n"
+        "  mkdir -p experiments/datasets\n"
+        "and copy adversarial_indirect_injection.json into experiments/ "
+        "or experiments/datasets/ .\n"
+        "Looked in:\n  - " + "\n  - ".join(candidates)
+    )
+
+
+DATASET_PATH = _resolve_dataset_path()
 RESULTS_PATH = os.path.join(
     os.path.dirname(__file__), "results", "indirect_injection_eval.json"
 )

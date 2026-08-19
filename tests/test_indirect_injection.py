@@ -15,15 +15,18 @@ from data_functions.query_engine import (
 )
 
 
-DATASET = os.path.abspath(
-    os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "experiments",
-        "datasets",
-        "adversarial_indirect_injection.json",
-    )
-)
+def _dataset_path():
+    here = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "experiments"))
+    for name in (
+        os.path.join(here, "adversarial_indirect_injection.json"),
+        os.path.join(here, "datasets", "adversarial_indirect_injection.json"),
+    ):
+        if os.path.isfile(name):
+            return name
+    raise FileNotFoundError("adversarial_indirect_injection.json not found under experiments/")
+
+
+DATASET = _dataset_path()
 
 
 class TestHeuristicFirstMitigation(unittest.TestCase):
