@@ -28,9 +28,8 @@ Thumbs.db
 *.ipynb_metadata
 
 # Datasets and large files (use DVC or document sources in datasets/README.md)
-datasets/
+/datasets/
 datasets/**/*.csv
-datasets/**/*.json
 datasets/**/*.parquet
 datasets/**/*.h5
 datasets/**/*.hdf5
@@ -41,6 +40,10 @@ datasets/**/*.zip
 datasets/**/*.tar.gz
 datasets/**/*.pcap
 datasets/**/*.pdf
+
+# Keep the small adversarial eval set that ships with the repo
+# !experiments/datasets/
+# !experiments/datasets/**
 
 # Model checkpoints
 *.pt

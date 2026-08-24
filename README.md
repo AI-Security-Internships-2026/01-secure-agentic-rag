@@ -40,6 +40,12 @@ Python, LangChain, OpenAI API, ChromaDB, FastAPI, Docker
 
 See `requirements.txt` for pinned dependencies.
 
+## Security evaluations
+
+- [`docs/guardrail-comparison.md`](docs/guardrail-comparison.md) explains the prompt-injection and PII/secret guardrail benchmark.
+- [`docs/indirect-injection-evaluation.md`](docs/indirect-injection-evaluation.md) explains the poisoned-context ASR evaluation and why it bypasses ChromaDB.
+- [`docs/threat_model.md`](docs/threat_model.md) defines the indirect prompt-injection threat model.
+
 ---
 
 ## Weekly Workflow
@@ -101,15 +107,32 @@ cp .env.example .env
 ```
 Open `.env` and fill in your keys and configuration details:
 ```env
-# LLM Providers
+# LLM Providers (OpenAI-compatible). Groq is the default; override for a VM DeepSeek server.
 GROQ_API_KEY=gsk_...
-GROQ_MODEL=llama-3.1-8b-instant
+GROQ_MODEL=openai/gpt-oss-20b
+# LLM_BASE_URL=http://YOUR_VM_IP:8000/v1
+# LLM_API_KEY=EMPTY
+# LLM_MODEL=deepseek-chat
 GOOGLE_API_KEY=AIzaSy...
 
 # SpiceDB (Authzed) Configuration
 SPICEDB_ENDPOINT=localhost:50051
 SPICEDB_PRESHARED_KEY=foobar
 ```
+
+#### Point generation at a DeepSeek model on a VM
+The app uses LangChain `ChatOpenAI`, which talks to any **OpenAI-compatible** HTTP API. Groq is only the default `LLM_BASE_URL`. If DeepSeek is served with vLLM, Ollama, SGLang, or llama.cpp on the VM, set these in `.env` (comment out or ignore Groq):
+
+```env
+LLM_BASE_URL=http://YOUR_VM_IP:8000/v1
+LLM_API_KEY=EMPTY
+LLM_MODEL=deepseek-chat
+```
+
+1. On the VM, confirm the server exposes `/v1/chat/completions` (vLLM default port **8000**, Ollama **11434** with `/v1`, official DeepSeek cloud `https://api.deepseek.com/v1`).
+2. Open the VM firewall (and cloud security group) for that port, or use an SSH tunnel from this laptop: `ssh -L 8000:127.0.0.1:8000 user@VM_IP`.
+3. From this laptop, list models: `curl http://YOUR_VM_IP:8000/v1/models` — copy the `id` into `LLM_MODEL`.
+4. Restart the CLI / eval so `python-dotenv` reloads `.env`. Embeddings still use `GOOGLE_API_KEY`; only chat/guardrails switch to DeepSeek.
 
 ---
 
@@ -175,7 +198,7 @@ To verify schema operations, database permissions, agent retry loops, and inject
   ```
 - **Run LangGraph Query Engine Loop & Injection Mitigation Tests**:
   ```bash
-  python -m unittest tests/test_query_engine.py
+  python -m unittest tests/test_query_engine.py tests/test_indirect_injection.py
   ```
 
 ---
@@ -185,6 +208,16 @@ To verify schema operations, database permissions, agent retry loops, and inject
 **Current state:** RAG stack (LangChain + ChromaDB + FAISS) with scalability testing done. Gap: no agent loop despite "agentic" in the project name — the current pipeline is single-shot retrieve-then-generate.
 
 **Novel contribution target:** turn this into an actual *secure* agentic RAG by giving it a multi-step agent loop and defending it against indirect prompt injection carried in retrieved documents — a live, under-addressed threat in RAG security.
+
+Threat model: [`docs/threat_model.md`](docs/threat_model.md). Adversarial eval (poisoned vs clean, ASR before/after):
+
+```bash
+python experiments/run_indirect_injection_eval.py
+```
+
+This experiment calls Groq over the network only. It does not download models or install extra packages.
+
+Step-by-step execution log and tabulated results: [`docs/task-execution-summary.md`](docs/task-execution-summary.md).
 
 | Date | Milestone |
 |---|---|
