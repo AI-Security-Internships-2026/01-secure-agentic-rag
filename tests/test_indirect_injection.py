@@ -16,14 +16,9 @@ from data_functions.query_engine import (
 
 
 def _dataset_path():
-    here = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "experiments"))
-    for name in (
-        os.path.join(here, "adversarial_indirect_injection.json"),
-        os.path.join(here, "datasets", "adversarial_indirect_injection.json"),
-    ):
-        if os.path.isfile(name):
-            return name
-    raise FileNotFoundError("adversarial_indirect_injection.json not found under experiments/")
+    return os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "experiments", "datasets", "adversarial_indirect_injection.json")
+    )
 
 
 DATASET = _dataset_path()
@@ -80,11 +75,7 @@ class TestGenerateFromContexts(unittest.TestCase):
     def test_empty_context_is_blocked(self):
         self.assertEqual(generate_from_contexts("q", [], isolate_context=True), BLOCKED_INJECTION_MESSAGE)
 
-    @patch("data_functions.query_engine.ChatOpenAI")
-    def test_isolated_generation_returns_model_text(self, mock_chat):
-        mock_llm = MagicMock()
-        mock_chat.return_value = mock_llm
-        mock_llm.side_effect = [AIMessage(content="AES-256-GCM is required.")]
+    def test_isolated_generation_returns_model_text(self):
         answer = generate_from_contexts(
             "Which algorithm?",
             ["Production volumes must use AES-256-GCM."],

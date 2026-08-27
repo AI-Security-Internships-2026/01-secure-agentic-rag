@@ -1,0 +1,5 @@
+name: Helm
+description: AuthInject-RAG API
+type: application
+version: 0.2.0
+appVersion: "0.2.0"

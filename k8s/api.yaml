@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: authinject
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authinject-api
+  namespace: authinject
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: authinject-api
+  template:
+    metadata:
+      labels:
+        app: authinject-api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: api
+          image: authinject-rag:0.2.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: APP_ENV
+              value: production
+            - name: SPICEDB_ENDPOINT
+              value: spicedb:50051
+            - name: QDRANT_URL
+              value: http://qdrant:6333
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: authinject-secrets
+                  key: jwt-secret
+            - name: SPICEDB_PRESHARED_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: authinject-secrets
+                  key: spicedb-preshared-key
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: authinject-api
+  namespace: authinject
+spec:
+  selector:
+    app: authinject-api
+  ports:
+    - port: 80
+      targetPort: 8000
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: authinject-api
+  namespace: authinject
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: authinject-api
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-egress
+  namespace: authinject
+spec:
+  podSelector:
+    matchLabels:
+      app: authinject-api
+  policyTypes: ["Egress", "Ingress"]
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    - {}
