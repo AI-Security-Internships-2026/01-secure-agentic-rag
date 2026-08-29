@@ -50,6 +50,11 @@ class Settings(BaseSettings):
 
     presidio_custom_deny_list: str = ""
     presidio_custom_patterns: str = ""
+    # Empty means the direct-identifier default set in secure_rag.retrieval.pii.
+    pii_entities: str = ""
+    # 0.35 keeps common phone-number formats (scored 0.4) while dropping the
+    # sub-0.1 noise that broad recognizers emit on digit strings.
+    pii_score_threshold: float = 0.35
 
     audit_log_path: str = "logs/audit.jsonl"
 
