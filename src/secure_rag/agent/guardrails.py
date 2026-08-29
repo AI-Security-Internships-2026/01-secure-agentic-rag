@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from secure_rag.agent.llm import LLMBudget, LLMError, invoke_text
+from secure_rag.agent.llm import LLMBudget, LLMError, invoke_text, strip_reasoning
 from secure_rag.settings import Settings, get_settings
 
 INDIRECT_INJECTION_REGEXES = [
@@ -109,5 +109,17 @@ def datamark(chunk: str) -> str:
 
 
 def parse_structured_label(text: str, allowed: set[str]) -> str | None:
-    token = (text or "").strip().split()[0].upper() if text else ""
-    return token if token in allowed else None
+    """Extract a single expected label, tolerating chatty or reasoning models.
+
+    Returns None when the verdict is absent or ambiguous so callers can fail closed.
+    """
+    cleaned = strip_reasoning(text or "")
+    if not cleaned:
+        return None
+    tokens = [token.strip(".,:;!\"'`*").upper() for token in cleaned.split()]
+    if tokens and tokens[0] in allowed:
+        return tokens[0]
+    present = [label for label in allowed if label in tokens]
+    if len(present) == 1:
+        return present[0]
+    return None
