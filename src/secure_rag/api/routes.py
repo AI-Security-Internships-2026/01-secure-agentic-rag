@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from secure_rag.agent.graph import query_rag_system
 from secure_rag.api.auth import Principal, create_token, get_principal
 from secure_rag.api.schemas import IngestRequest, QueryRequest, TokenRequest
-from secure_rag.authz.client import get_authz_client
+from secure_rag.authz.client import AuthorizationError, get_authz_client
 from secure_rag.retrieval.ingest import ingest_texts
 from secure_rag.retrieval.qdrant_store import get_vector_store
 from secure_rag.settings import get_settings
@@ -61,14 +61,21 @@ def query(body: QueryRequest, principal: Principal = Depends(get_principal)):
 
 @router.post("/ingest")
 def ingest(body: IngestRequest, principal: Principal = Depends(get_principal)):
-    return ingest_texts(
-        body.document_id,
-        body.texts,
-        owner_id=principal.user_id,
-        tenant_id=principal.tenant_id,
-        viewers=body.viewers,
-        redact_pii=body.redact_pii,
-    )
+    try:
+        return ingest_texts(
+            body.document_id,
+            body.texts,
+            owner_id=principal.user_id,
+            tenant_id=principal.tenant_id,
+            viewers=body.viewers,
+            redact_pii=body.redact_pii,
+        )
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc) or "authorization or dependency unavailable") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}") from exc
 
 
 @router.get("/permissions")
