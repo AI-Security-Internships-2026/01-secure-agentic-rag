@@ -47,6 +47,7 @@ secure-rag = "secure_rag.cli:main"
 secure-rag-api = "secure_rag.api.app:serve"
 authinject-eval = "secure_rag.benchmark.runner:main"
 authinject-analyze = "secure_rag.benchmark.analyze:main"
+guardrail-compare = "secure_rag.benchmark.guardrail_compare:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

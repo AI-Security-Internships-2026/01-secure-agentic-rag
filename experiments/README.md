@@ -19,3 +19,11 @@ python -m secure_rag.benchmark.runner --live --repeats 3 --split test --out expe
 | `results/authinject_tables.json` | Tables rebuilt from the JSONL |
 
 `C0` is the non-agentic baseline. `C7`/`C8` turn the rewrite/rerank loop on. `--live` scores generated model text; the default is extractive (CI).
+
+Retrieved-context injection scanner comparison (InjecAgent, ACL 2024):
+
+```bash
+python -m secure_rag.benchmark.guardrail_compare --out experiments/results/guardrail_comparison.json
+```
+
+See `docs/guardrail-comparison.md`.

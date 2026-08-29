@@ -56,13 +56,17 @@ def llm_is_indirect_injection(chunk: str, budget: LLMBudget | None = None, setti
         f"Snippet:\n{chunk[:4000]}"
     )
     try:
-        result = invoke_text(prompt, budget=budget, settings=settings).upper()
+        result = invoke_text(prompt, budget=budget, settings=settings)
     except LLMError:
         if settings.llm_fail_closed:
             return True
         return False
-    token = result.split()[0] if result else "SAFE"
-    return token == "INJECTION"
+    token = parse_structured_label(result, {"SAFE", "INJECTION"})
+    if token == "INJECTION":
+        return True
+    if token == "SAFE":
+        return False
+    return bool(settings.llm_fail_closed)
 
 
 def is_indirect_injection(
