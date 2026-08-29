@@ -104,12 +104,48 @@ def build_held_out_samples(*, n_pos: int = N_POS, n_neg: int = N_NEG) -> dict:
             }
         )
 
-    rng_pos = positives[:]
-    rng_neg = negatives[:]
+    def _unique(rows: list[dict]) -> list[dict]:
+        seen: set[str] = set()
+        unique: list[dict] = []
+        for item in rows:
+            if item["id"] in seen:
+                continue
+            seen.add(item["id"])
+            unique.append(item)
+        return unique
+
+    # InjecAgent ships far fewer user_cases than attacker cases. Pair templates with
+    # other users' paper instructions/thoughts so the negative pool can reach n_neg.
+    if len(_unique(negatives)) < n_neg:
+        for user in users:
+            template = str(user.get("Tool Response Template") or "")
+            for donor in users:
+                thought = str(donor.get("Thought") or "").strip()
+                instruction = str(donor.get("User Instruction") or "").strip()
+                body = f"{instruction} {thought}".strip()
+                if not body:
+                    continue
+                text = _fill_response(template, body)
+                item = {
+                    "id": f"injecagent_neg_{_stable_id('clean_pair', str(user.get('User Tool')), str(donor.get('User Tool')), instruction)}",
+                    "label": False,
+                    "source": "injecagent",
+                    "split": "held_out",
+                    "attack_family": "none",
+                    "user_tool": user.get("User Tool"),
+                    "setting": "clean_tool_response",
+                    "text": text,
+                }
+                negatives.append(item)
+
+    rng_pos = _unique(positives)
+    rng_neg = _unique(negatives)
     rng_pos.sort(key=lambda item: item["id"])
     rng_neg.sort(key=lambda item: item["id"])
     selected = rng_pos[:n_pos] + rng_neg[:n_neg]
     selected.sort(key=lambda item: item["id"])
+    n_selected_pos = sum(1 for s in selected if s["label"])
+    n_selected_neg = sum(1 for s in selected if not s["label"])
     return {
         "task": (
             "Binary classification of retrieved tool-response documents: "
@@ -118,7 +154,7 @@ def build_held_out_samples(*, n_pos: int = N_POS, n_neg: int = N_NEG) -> dict:
         ),
         "citation": INJECAGENT_CITATION,
         "held_out_seed": HELD_OUT_SEED,
-        "n_positive": n_pos,
-        "n_negative": n_neg,
+        "n_positive": n_selected_pos,
+        "n_negative": n_selected_neg,
         "samples": selected,
     }

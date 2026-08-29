@@ -179,35 +179,10 @@ def _llm_guard_predict(threshold: float) -> Callable[[str], bool]:
 
 
 def _guardrails_predict() -> Callable[[str], bool]:
-    settings = get_settings()
-    if settings.llm_base_url and not _loopback_url(settings.llm_base_url):
-        key = os.environ.get("OPENAI_API_KEY", "")
-        if key and key not in {"EMPTY", "empty", "none"}:
-            raise RuntimeError("refusing Guardrails because LLM_BASE_URL is not loopback")
-    from guardrails_ai.detect_prompt_injection import DetectPromptInjection
-
-    try:
-        detector = DetectPromptInjection(on_fail="noop")
-    except TypeError:
-        detector = DetectPromptInjection()
-
-    def _is_fail(result: Any) -> bool:
-        if result is None:
-            return False
-        if getattr(result, "error_message", None):
-            return True
-        outcome = str(getattr(result, "outcome", "") or getattr(result, "status", "")).lower()
-        if "fail" in outcome:
-            return True
-        return type(result).__name__.lower().startswith("fail")
-
-    def predict(text: str) -> bool:
-        result = detector.validate(text[:4000], {})
-        return _is_fail(result)
-
-    # Probe one short string so constructor/API errors surface before the full set.
-    predict("hello")
-    return predict
+    raise RuntimeError(
+        "Guardrails DetectPromptInjection/Rebuff requires a Pinecone index (and typically OpenAI). "
+        "That sends retrieved-context samples to a hosted vector store, so it is not executed."
+    )
 
 
 def _repo_llm_predict() -> Callable[[str], bool]:
@@ -305,7 +280,11 @@ def run_comparison(*, n_pos: int = 40, n_neg: int = 40, llm_guard_threshold: flo
                 "threshold": llm_guard_threshold,
                 "configuration": {
                     "role": "local substitute for Guardrails DetectPromptInjection",
-                    "reason": "DetectPromptInjection depends on Rebuff, which requires openai<2 and langchain-openai<0.0.4. Those pins conflict with the application environment, so this published DistilBERT injection classifier is run locally instead.",
+                    "reason": (
+                        "Guardrails DetectPromptInjection requires Rebuff plus a Pinecone index "
+                        "(hosted). Samples stay on-box, so this published DistilBERT injection "
+                        "classifier is the second local baseline instead."
+                    ),
                     "hosted_apis": False,
                 },
             }
@@ -363,6 +342,12 @@ def run_comparison(*, n_pos: int = 40, n_neg: int = 40, llm_guard_threshold: flo
             "Guardrails AI",
             "PII / DetectPII hub validators",
             "PII redaction is a different security function from injection detection on retrieved context.",
+        ),
+        "guardrails_ai_detect_prompt_injection_rebuff_pinecone": _not_comparable(
+            "Guardrails AI",
+            "DetectPromptInjection (Rebuff + Pinecone)",
+            "The Hub validator requires pinecone_index. Using it would upload InjecAgent retrieved-context "
+            "text to a hosted vector database. Not executed; fmops DistilBERT is the local substitute.",
         ),
     }
 

@@ -17,7 +17,7 @@ This is **retrieved-context validation**, not user-query jailbreak classificatio
 |------|-----------|------|
 | `repository_heuristic` | `heuristic_is_indirect_injection` | Current repo control |
 | `protectai_llm_guard_prompt_injection` | Protect AI LLM Guard `PromptInjection` (same ProtectAI DeBERTa weights via `transformers` if `scan()` fails) | External baseline 1 |
-| `guardrails_ai_detect_prompt_injection` | Guardrails AI `DetectPromptInjection` (Rebuff) | External baseline 2 when Rebuff/openai 1.x can run |
+| `guardrails_ai_detect_prompt_injection` | Guardrails AI `DetectPromptInjection` (Rebuff + Pinecone) | Not executed: requires a hosted Pinecone index |
 | `huggingface_fmops_prompt_injection` | `fmops/distilbert-prompt-injection` via Hugging Face `pipeline` | Local substitute if Guardrails/Rebuff cannot run in the app venv |
 
 Marked **not comparable** (not executed as equivalents):
@@ -56,7 +56,7 @@ mkdir -p benchmarks/.cache
 test -d benchmarks/.cache/InjecAgent || git clone --depth 1 https://github.com/uiuc-kang-lab/InjecAgent.git benchmarks/.cache/InjecAgent
 ```
 
-`DetectPromptInjection` pulls Rebuff, which requires `openai<2` and `langchain-openai<0.0.4`. Installing those into the **app** `.venv` breaks LangGraph. If Guardrails fails to import or scan, the harness runs `fmops/distilbert-prompt-injection` locally as the second equivalent injection classifier and records why Guardrails was not comparable.
+`DetectPromptInjection` requires a **Pinecone index** (Rebuff). That would send InjecAgent retrieved-context text off-box, so it is marked not comparable. The harness runs `fmops/distilbert-prompt-injection` locally as the second equivalent injection classifier.
 
 If you already installed into `.venv` and just want the JSON now:
 
