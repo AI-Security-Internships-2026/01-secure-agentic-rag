@@ -1,5 +1,7 @@
 # Task Execution and Results Summary
 
+> Historical lab notebook (August 2026). Paths such as `src/data_functions/` and `experiments/run_indirect_injection_eval.py` no longer exist. Current code is `src/secure_rag/`; current eval is `python -m secure_rag.benchmark.runner`.
+
 **Project:** Kubernetes Native Secure Agentic RAG  
 **Scope:** README milestones for 9 Aug 2026 and 16 Aug 2026  
 **Executed:** 19 Aug 2026  

@@ -1,6 +1,6 @@
 # Indirect injection evaluation
 
-The legacy 10+10 canary set in `experiments/datasets/adversarial_indirect_injection.json` is a **smoke test** only.
+The 10+10 canary set in `tests/fixtures/adversarial_indirect_injection.json` is a **smoke test** only.
 
 Paper claims must use:
 

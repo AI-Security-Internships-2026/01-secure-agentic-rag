@@ -142,15 +142,15 @@ Research evaluation, not the live API.
 | `scoring.py` | Marks leakage, injection success, utility, Wilson 95% intervals. |
 | `analyze.py` | Reads the JSONL of raw rows and writes a summary table JSON. |
 
-### 4.8 Compatibility shims (old import paths)
+### 4.8 Deploy and experiments
 
-These exist so older scripts still import:
+- `docker-compose.yml` — Postgres, SpiceDB, Qdrant (and optional API container)
+- `k8s/api.yaml` — plain Kubernetes manifests
+- `helm/authinject-rag/` — same API with Helm values
+- `experiments/` — saved benchmark JSON; run via `python -m secure_rag.benchmark.runner`
+- `tests/fixtures/` — small heuristic smoke dataset
 
-- `src/main.py` → CLI
-- `src/data_functions/` → old load/query names
-- `src/database/` → old SpiceDB / Chroma names, now Qdrant
-
-Prefer `secure_rag.*` for new work.
+There is a single Python package: `secure_rag`. The CLI is `secure-rag`. There are no leftover Chroma or `data_functions` modules.
 
 ### 4.9 Everything else in the repo
 
@@ -348,8 +348,6 @@ curl -s http://127.0.0.1:8080/permissions \
 ## 8. Interactive CLI
 
 ```bash
-python src/main.py
-# or
 secure-rag
 ```
 
@@ -595,6 +593,7 @@ Install:     pip install -e ".[dev]"
 Services:    docker compose up -d postgres spicedb qdrant
 LLM:         your vLLM on LLM_BASE_URL
 API:         uvicorn secure_rag.api.app:app --port 8080
+CLI:         secure-rag
 Token:       POST /token
 Ingest:      POST /ingest
 Ask:         POST /query

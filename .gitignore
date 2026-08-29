@@ -27,23 +27,8 @@ Thumbs.db
 .ipynb_checkpoints/
 *.ipynb_metadata
 
-# Datasets and large files (use DVC or document sources in datasets/README.md)
+# Datasets and large files
 /datasets/
-datasets/**/*.csv
-datasets/**/*.parquet
-datasets/**/*.h5
-datasets/**/*.hdf5
-datasets/**/*.pkl
-datasets/**/*.npy
-datasets/**/*.npz
-datasets/**/*.zip
-datasets/**/*.tar.gz
-datasets/**/*.pcap
-datasets/**/*.pdf
-
-# Keep the small adversarial eval set that ships with the repo
-# !experiments/datasets/
-# !experiments/datasets/**
 
 # Model checkpoints
 *.pt
@@ -81,4 +66,3 @@ chroma_db/
 chromadb/
 qdrant_storage/
 benchmarks/.cache/
-logs/

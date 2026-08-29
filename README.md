@@ -41,7 +41,7 @@ Run API and CLI:
 
 ```bash
 uvicorn secure_rag.api.app:app --port 8080
-python src/main.py
+secure-rag
 ```
 
 Mint a development token (`/token` is disabled when `APP_ENV=production`):

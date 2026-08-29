@@ -1,4 +1,4 @@
-from secure_rag.retrieval.ingest import ingest_pdf, ingest_texts, migrate_chroma
+from secure_rag.retrieval.ingest import ingest_pdf, ingest_texts
 from secure_rag.retrieval.qdrant_store import RetrievedChunk, get_vector_store, reset_vector_store
 
 __all__ = [
@@ -7,5 +7,4 @@ __all__ = [
     "reset_vector_store",
     "ingest_pdf",
     "ingest_texts",
-    "migrate_chroma",
 ]

@@ -1,8 +1,10 @@
 # Guardrail Comparison Test
 
+> Historical note: the script `experiments/run_guardrail_comparison.py` was removed. Live classification lives in `src/secure_rag/agent/guardrails.py` and Presidio in `src/secure_rag/retrieval/pii.py`. Paper numbers use `python -m secure_rag.benchmark.runner`. This page records an earlier Groq/laptop experiment.
+
 ## Purpose
 
-`experiments/run_guardrail_comparison.py` benchmarks security checks for two tasks:
+That earlier script compared security checks for two tasks:
 
 1. Prompt-injection classification.
 2. PII and secret detection.

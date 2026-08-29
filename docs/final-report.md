@@ -24,7 +24,7 @@ Benchmark fixture: 92 cases (OGX-style tenants + InjecAgent/AgentDojo families).
 
 ## 4. Implementation
 
-Installable package `secure_rag` (`src/secure_rag/`). Compatibility shims preserve `src/main.py` and `data_functions.*`. Compose and Kubernetes assets in `docker-compose.yml`, `k8s/`, `helm/`.
+Installable package `secure_rag` (`src/secure_rag/`). Compose and Kubernetes assets in `docker-compose.yml`, `k8s/`, and `helm/`. CLI entry point: `secure-rag`. Benchmark: `python -m secure_rag.benchmark.runner`.
 
 ## 5. Evaluation
 
