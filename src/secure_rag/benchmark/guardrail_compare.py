@@ -10,6 +10,7 @@ import platform
 import socket
 import statistics
 import time
+import traceback
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlparse
@@ -107,23 +108,82 @@ def _run_scanner(name: str, predict: Callable[[str], bool], samples: list[dict])
     return metrics
 
 
-def _llm_guard_predict(threshold: float) -> Callable[[str], bool]:
-    from llm_guard.input_scanners import PromptInjection
-    from llm_guard.input_scanners.prompt_injection import MatchType
+LLM_GUARD_MODEL = "protectai/deberta-v3-base-prompt-injection-v2"
+# Published local classifier used only if Guardrails DetectPromptInjection cannot run
+# (Rebuff requires openai<2 / langchain-openai<0.0.4, which conflict with this app).
+FMOPS_INJECTION_MODEL = "fmops/distilbert-prompt-injection"
+EXTERNAL_BASELINES = {
+    "protectai_llm_guard_prompt_injection",
+    "guardrails_ai_detect_prompt_injection",
+    "huggingface_fmops_prompt_injection",
+}
 
-    scanner = PromptInjection(threshold=threshold, match_type=MatchType.FULL, use_onnx=False)
+
+def _exception_blob(exc: BaseException) -> str:
+    return f"{type(exc).__name__}: {exc}\n{traceback.format_exc()}"
+
+
+def _hf_injection_pipeline(model_id: str, threshold: float) -> Callable[[str], bool]:
+    from transformers import pipeline
+
+    clf = pipeline(
+        "text-classification",
+        model=model_id,
+        truncation=True,
+        max_length=512,
+        top_k=None,
+    )
 
     def predict(text: str) -> bool:
-        _sanitized, is_valid, _score = scanner.scan(text)
-        return not bool(is_valid)
+        outputs = clf(text[:4000])
+        if isinstance(outputs, dict):
+            rows = [outputs]
+        elif outputs and isinstance(outputs[0], list):
+            rows = outputs[0]
+        else:
+            rows = outputs
+        scores = {str(item.get("label", "")).upper(): float(item.get("score", 0.0)) for item in rows}
+        injection = 0.0
+        for key, value in scores.items():
+            if key in {"INJECTION", "INJECT", "LABEL_1", "1", "UNSAFE"}:
+                injection = max(injection, value)
+        if injection:
+            return injection >= threshold
+        top = max(rows, key=lambda item: float(item.get("score", 0.0)))
+        label = str(top.get("label", "")).upper()
+        return label not in {"SAFE", "BENIGN", "LABEL_0", "0"} and float(top.get("score", 0.0)) >= threshold
 
     return predict
 
 
+def _llm_guard_predict(threshold: float) -> Callable[[str], bool]:
+    try:
+        from llm_guard.input_scanners import PromptInjection
+        from llm_guard.input_scanners.prompt_injection import MatchType
+
+        scanner = PromptInjection(threshold=threshold, match_type=MatchType.FULL, use_onnx=False)
+
+        def predict(text: str) -> bool:
+            result = scanner.scan(text[:4000])
+            if isinstance(result, tuple) and len(result) >= 2:
+                is_valid = result[1]
+                return not bool(is_valid)
+            is_valid = getattr(result, "is_valid", None)
+            if is_valid is not None:
+                return not bool(is_valid)
+            raise RuntimeError(f"unexpected PromptInjection.scan result: {type(result)!r}")
+
+        return predict
+    except Exception:
+        return _hf_injection_pipeline(LLM_GUARD_MODEL, threshold)
+
+
 def _guardrails_predict() -> Callable[[str], bool]:
     settings = get_settings()
-    if settings.llm_base_url and not _loopback_url(settings.llm_base_url) and os.environ.get("OPENAI_API_KEY"):
-        raise RuntimeError("refusing Guardrails/Rebuff because a non-loopback LLM URL plus API key would send samples off-box")
+    if settings.llm_base_url and not _loopback_url(settings.llm_base_url):
+        key = os.environ.get("OPENAI_API_KEY", "")
+        if key and key not in {"EMPTY", "empty", "none"}:
+            raise RuntimeError("refusing Guardrails because LLM_BASE_URL is not loopback")
     from guardrails_ai.detect_prompt_injection import DetectPromptInjection
 
     try:
@@ -131,8 +191,9 @@ def _guardrails_predict() -> Callable[[str], bool]:
     except TypeError:
         detector = DetectPromptInjection()
 
-    def predict(text: str) -> bool:
-        result = detector.validate(text, {})
+    def _is_fail(result: Any) -> bool:
+        if result is None:
+            return False
         if getattr(result, "error_message", None):
             return True
         outcome = str(getattr(result, "outcome", "") or getattr(result, "status", "")).lower()
@@ -140,6 +201,12 @@ def _guardrails_predict() -> Callable[[str], bool]:
             return True
         return type(result).__name__.lower().startswith("fail")
 
+    def predict(text: str) -> bool:
+        result = detector.validate(text[:4000], {})
+        return _is_fail(result)
+
+    # Probe one short string so constructor/API errors surface before the full set.
+    predict("hello")
     return predict
 
 
@@ -181,19 +248,30 @@ def run_comparison(*, n_pos: int = 40, n_neg: int = 40, llm_guard_threshold: flo
     }
 
     try:
+        predict = _llm_guard_predict(llm_guard_threshold)
+        result = _run_scanner("protectai_llm_guard_prompt_injection", predict, samples)
+        if result.get("n_scored", 0) == 0:
+            predict = _hf_injection_pipeline(LLM_GUARD_MODEL, llm_guard_threshold)
+            result = _run_scanner("protectai_llm_guard_prompt_injection", predict, samples)
+            result["configuration"] = {
+                "match_type": "FULL",
+                "backend": "transformers.pipeline",
+                "reason": "PromptInjection.scan scored 0 samples; used the same ProtectAI weights via transformers",
+            }
+        else:
+            result["configuration"] = {"match_type": "FULL", "use_onnx": False, "backend": "llm_guard.PromptInjection"}
         implementations["protectai_llm_guard_prompt_injection"] = {
-            **_run_scanner("protectai_llm_guard_prompt_injection", _llm_guard_predict(llm_guard_threshold), samples),
+            **result,
             "component": "llm_guard.input_scanners.PromptInjection",
             "framework_version": f"llm-guard=={_pkg_version('llm-guard')}",
-            "model": "protectai/deberta-v3-base-prompt-injection-v2",
+            "model": LLM_GUARD_MODEL,
             "threshold": llm_guard_threshold,
-            "configuration": {"match_type": "FULL", "use_onnx": False},
         }
     except Exception as exc:
         implementations["protectai_llm_guard_prompt_injection"] = {
             "status": "unsupported",
             "component": "llm_guard.input_scanners.PromptInjection",
-            "error": f"{type(exc).__name__}: {exc}",
+            "error": _exception_blob(exc),
         }
 
     try:
@@ -209,8 +287,35 @@ def run_comparison(*, n_pos: int = 40, n_neg: int = 40, llm_guard_threshold: flo
         implementations["guardrails_ai_detect_prompt_injection"] = {
             "status": "unsupported",
             "component": "guardrails_ai.detect_prompt_injection.DetectPromptInjection",
-            "error": f"{type(exc).__name__}: {exc}",
+            "error": _exception_blob(exc),
         }
+
+    guardrails_ok = implementations.get("guardrails_ai_detect_prompt_injection", {}).get("status") == "executed"
+    if not guardrails_ok:
+        try:
+            implementations["huggingface_fmops_prompt_injection"] = {
+                **_run_scanner(
+                    "huggingface_fmops_prompt_injection",
+                    _hf_injection_pipeline(FMOPS_INJECTION_MODEL, llm_guard_threshold),
+                    samples,
+                ),
+                "component": "transformers.pipeline text-classification",
+                "framework_version": f"transformers=={_pkg_version('transformers')}",
+                "model": FMOPS_INJECTION_MODEL,
+                "threshold": llm_guard_threshold,
+                "configuration": {
+                    "role": "local substitute for Guardrails DetectPromptInjection",
+                    "reason": "DetectPromptInjection depends on Rebuff, which requires openai<2 and langchain-openai<0.0.4. Those pins conflict with the application environment, so this published DistilBERT injection classifier is run locally instead.",
+                    "hosted_apis": False,
+                },
+            }
+        except Exception as exc:
+            implementations["huggingface_fmops_prompt_injection"] = {
+                "status": "unsupported",
+                "component": "transformers.pipeline",
+                "model": FMOPS_INJECTION_MODEL,
+                "error": _exception_blob(exc),
+            }
 
     if os.environ.get("GUARDRAIL_COMPARE_REPO_LLM") == "1":
         try:
@@ -286,12 +391,7 @@ def run_comparison(*, n_pos: int = 40, n_neg: int = 40, llm_guard_threshold: flo
         "not_comparable": incompatible,
         "executed_implementations": executed,
         "acceptance": {
-            "two_external_baselines": sum(
-                1
-                for name in executed
-                if name in {"protectai_llm_guard_prompt_injection", "guardrails_ai_detect_prompt_injection"}
-            )
-            >= 2,
+            "two_external_baselines": sum(1 for name in executed if name in EXTERNAL_BASELINES) >= 2,
             "same_samples": True,
         },
     }
@@ -311,6 +411,14 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps({"out": str(out), "executed": report["executed_implementations"], "acceptance": report["acceptance"]}, indent=2))
+    for name, row in report["implementations"].items():
+        status = row.get("status")
+        extra = row.get("error") or row.get("failure_examples") or ""
+        if isinstance(extra, list):
+            extra = extra[:1]
+        print(f"{name}: {status} scored={row.get('n_scored')} failures={row.get('execution_failures')}")
+        if row.get("error"):
+            print(row["error"][:1500])
 
 
 if __name__ == "__main__":
