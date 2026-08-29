@@ -108,11 +108,16 @@ class RealSpiceDBClient:
     def write_relationships(self, tuples: list[RelationTuple]) -> None:
         from authzed.api.v1 import ObjectReference, Relationship, RelationshipUpdate, SubjectReference, WriteRelationshipsRequest
 
+        seen: set[RelationTuple] = set()
         updates = []
         for r_type, r_id, rel, s_type, s_id in tuples:
+            key = (r_type, r_id, rel, s_type, s_id)
+            if key in seen:
+                continue
+            seen.add(key)
             updates.append(
                 RelationshipUpdate(
-                    operation=RelationshipUpdate.Operation.OPERATION_CREATE,
+                    operation=RelationshipUpdate.Operation.OPERATION_TOUCH,
                     relationship=Relationship(
                         resource=ObjectReference(object_type=r_type, object_id=r_id),
                         relation=rel,
@@ -120,6 +125,8 @@ class RealSpiceDBClient:
                     ),
                 )
             )
+        if not updates:
+            return
         self.client.WriteRelationships(WriteRelationshipsRequest(updates=updates))
 
     def delete_relationships(self, resource_type: str, resource_id: str | None = None) -> None:

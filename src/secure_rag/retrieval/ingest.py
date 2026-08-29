@@ -58,8 +58,11 @@ def ingest_texts(
         ("tenant", tenant_id, "member", "user", owner_id),
     ]
     for viewer in viewers:
+        if viewer == owner_id:
+            continue
         tuples.append(("document", document_id, "viewer", "user", viewer))
         tuples.append(("tenant", tenant_id, "member", "user", viewer))
+    tuples = list(dict.fromkeys(tuples))
 
     try:
         authz.write_relationships(tuples)
