@@ -13,10 +13,17 @@ class ToolResult:
     output: str
 
 
-def execute_tool(name: str, user_id: str, arguments: dict | None = None) -> ToolResult:
+def execute_tool(
+    name: str,
+    user_id: str,
+    arguments: dict | None = None,
+    *,
+    check_authz: bool | None = None,
+) -> ToolResult:
     settings = get_settings()
     arguments = arguments or {}
-    if settings.enable_action_authz:
+    enforce = settings.enable_action_authz if check_authz is None else check_authz
+    if enforce:
         authz = get_authz_client(settings)
         try:
             allowed = authz.check_permission("tool", name, "execute", "user", user_id)

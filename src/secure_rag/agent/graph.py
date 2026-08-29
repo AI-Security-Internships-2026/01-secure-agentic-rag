@@ -8,6 +8,7 @@ from langgraph.graph import END, StateGraph
 from secure_rag.agent.guardrails import (
     BLOCKED_INJECTION_MESSAGE,
     datamark,
+    extractive_generate,
     filter_injected_chunks,
     parse_structured_label,
 )
@@ -41,6 +42,10 @@ class AgentState(TypedDict, total=False):
     enable_datamarking: bool
     enable_llm_injection_scan: bool
     enable_action_authz: bool
+    enable_agent_loop: bool
+    prior_contexts: list[str]
+    prior_retrieved: list[dict[str, Any]]
+    generator: str
     llm_calls: int
     budget_max: int
 
@@ -126,7 +131,7 @@ def guard_input(state: AgentState) -> dict:
     settings = get_settings()
     anonymized = anonymize_text(state["query"])
     budget = _budget(state)
-    if settings.app_env != "test":
+    if settings.app_env != "test" and state.get("enable_agent_loop", True):
         label = parse_structured_label(
             invoke_text(
                 "Classify the user query. Reply with exactly SAFE or MALICIOUS.\n" f"Query: {anonymized}",
@@ -152,12 +157,20 @@ def retrieve_node(state: AgentState) -> dict:
     )
     merged = dict(state.get("diagnostics", {}))
     merged.update(diagnostics)
+    contexts = [c.text for c in chunks]
+    retrieved = [
+        {"chunk_id": c.chunk_id, "document_id": c.document_id, "tenant_id": c.tenant_id, "score": c.score, "taint": c.taint}
+        for c in chunks
+    ]
+    prior_contexts = list(state.get("prior_contexts") or [])
+    prior_retrieved = list(state.get("prior_retrieved") or [])
+    if prior_contexts:
+        contexts = prior_contexts + contexts
+        retrieved = prior_retrieved + retrieved
+        merged["cross_turn_prior_chunks"] = len(prior_contexts)
     return {
-        "contexts": [c.text for c in chunks],
-        "retrieved": [
-            {"chunk_id": c.chunk_id, "document_id": c.document_id, "tenant_id": c.tenant_id, "score": c.score, "taint": c.taint}
-            for c in chunks
-        ],
+        "contexts": contexts,
+        "retrieved": retrieved,
         "diagnostics": merged,
     }
 
@@ -183,7 +196,12 @@ def verify_and_rerank(state: AgentState) -> dict:
     if not contexts:
         return {"contexts": [], "diagnostics": diagnostics, "loop_step": state.get("loop_step", 0) + 1, "llm_calls": budget.used}
     ranked = contexts
-    if settings.app_env != "test" and contexts:
+    rerank = (
+        settings.app_env != "test"
+        and bool(state.get("enable_agent_loop", True))
+        and bool(contexts)
+    )
+    if rerank:
         try:
             listing = "\n\n".join(f"--- Chunk {i+1} ---\n{chunk}" for i, chunk in enumerate(contexts))
             response = invoke_text(
@@ -229,10 +247,12 @@ def generate_answer(state: AgentState) -> dict:
             return {"answer": BLOCKED_INJECTION_MESSAGE}
         return {"answer": "No relevant context found in the database to answer this question."}
     marked = [datamark(c) if state.get("enable_datamarking", True) else c for c in contexts]
-    if settings.app_env == "test":
-        return {"answer": "\n".join(marked)}
+    isolate = bool(state.get("enable_context_isolation", True))
+    use_llm = state.get("generator") == "llm" or (state.get("generator") != "extractive" and settings.app_env != "test")
+    if not use_llm:
+        return {"answer": extractive_generate(marked if not isolate else contexts, isolate=isolate)}
     context_text = "\n\n".join(f"--- Chunk {i+1} ---\n{c}" for i, c in enumerate(marked))
-    template = ISOLATED_GENERATOR_PROMPT if state.get("enable_context_isolation", True) else NAIVE_GENERATOR_PROMPT
+    template = ISOLATED_GENERATOR_PROMPT if isolate else NAIVE_GENERATOR_PROMPT
     budget = _budget(state)
     answer = invoke_text(template.format(context_text=context_text, query=state["anonymized_query"]), budget=budget)
     return {"answer": answer, "llm_calls": budget.used}
@@ -308,8 +328,16 @@ def query_rag_system(
     tenant_id: str = "",
     enable_datamarking: bool | None = None,
     enable_llm_injection_scan: bool | None = None,
+    enable_agent_loop: bool = True,
+    enable_action_authz: bool | None = None,
+    generator: str = "auto",
+    prior_contexts: list[str] | None = None,
+    prior_retrieved: list[dict[str, Any]] | None = None,
 ) -> dict:
     settings = get_settings()
+    if generator == "auto":
+        generator = "extractive" if settings.app_env == "test" else "llm"
+    max_steps = settings.max_agent_steps if enable_agent_loop else 1
     initial: AgentState = {
         "collection_name": collection_name,
         "query": query,
@@ -321,14 +349,18 @@ def query_rag_system(
         "contexts": [],
         "retrieved": [],
         "answer": "",
-        "diagnostics": {},
+        "diagnostics": {"agentic": enable_agent_loop, "generator": generator},
         "loop_step": 0,
-        "max_steps": settings.max_agent_steps,
+        "max_steps": max_steps,
         "enable_indirect_injection_scan": enable_indirect_injection_scan,
         "enable_context_isolation": enable_context_isolation,
         "enable_datamarking": settings.enable_datamarking if enable_datamarking is None else enable_datamarking,
         "enable_llm_injection_scan": settings.enable_llm_injection_scan if enable_llm_injection_scan is None else enable_llm_injection_scan,
-        "enable_action_authz": settings.enable_action_authz,
+        "enable_action_authz": settings.enable_action_authz if enable_action_authz is None else enable_action_authz,
+        "enable_agent_loop": enable_agent_loop,
+        "prior_contexts": prior_contexts or [],
+        "prior_retrieved": prior_retrieved or [],
+        "generator": generator,
         "llm_calls": 0,
         "budget_max": settings.max_llm_calls,
     }

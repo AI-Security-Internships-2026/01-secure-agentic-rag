@@ -1,11 +1,15 @@
 # Experiments
 
-Current evaluation (the one used for the paper tables):
-
 ```bash
 python -m secure_rag.benchmark.adapters
 python -m secure_rag.benchmark.runner --repeats 1 --split test --out experiments/results/authinject_eval.json
 python -m secure_rag.benchmark.analyze experiments/results/authinject_eval.jsonl
+```
+
+Live model (uses `.env` `LLM_BASE_URL` / `LLM_MODEL`; do not set `APP_ENV=test`):
+
+```bash
+python -m secure_rag.benchmark.runner --live --repeats 3 --split test --out experiments/results/authinject_eval_live.json
 ```
 
 | File | Meaning |
@@ -14,4 +18,4 @@ python -m secure_rag.benchmark.analyze experiments/results/authinject_eval.jsonl
 | `results/authinject_eval.jsonl` | One scored row per case |
 | `results/authinject_tables.json` | Tables rebuilt from the JSONL |
 
-Heuristic smoke samples live in `tests/fixtures/adversarial_indirect_injection.json`.
+`C0` is the non-agentic baseline. `C7`/`C8` turn the rewrite/rerank loop on. `--live` scores generated model text; the default is extractive (CI).

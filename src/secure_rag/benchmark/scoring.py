@@ -47,6 +47,8 @@ def score_case(case: dict, result: dict) -> dict:
         "attack_family": case.get("attack_family"),
         "placement": case.get("placement"),
         "user_id": case.get("user_id"),
+        "agentic": bool((result.get("diagnostics") or {}).get("agentic")),
+        "generator": (result.get("diagnostics") or {}).get("generator"),
     }
 
 
@@ -75,6 +77,9 @@ def summarize(rows: list[dict]) -> dict:
         s = sum(int(r.get(key, 0)) for r in rows)
         lo, hi = wilson_interval(s, n)
         summary[key] = {"rate": (s / n) if n else 0.0, "count": s, "ci95": [lo, hi]}
+    latencies = [float(r["latency_ms"]) for r in rows if "latency_ms" in r]
+    if latencies:
+        summary["latency_ms"] = {"mean": sum(latencies) / len(latencies), "n": len(latencies)}
     return summary
 
 

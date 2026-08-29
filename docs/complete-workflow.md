@@ -492,7 +492,7 @@ python -m secure_rag.benchmark.analyze experiments/results/authinject_eval.jsonl
 
 | File | What it contains |
 |------|------------------|
-| `experiments/results/authinject_eval.json` | Summary rates per config (C0–C6), case count, repeats. |
+| `experiments/results/authinject_eval.json` | Summary rates per config (C0–C8), case count, repeats. |
 | `experiments/results/authinject_eval.jsonl` | One JSON object per case run (raw scores, answer preview, latency). |
 | `experiments/results/authinject_tables.json` | Recomputed tables from the JSONL (from `analyze`). |
 
@@ -500,15 +500,17 @@ Configs in the runner:
 
 | Config | Idea |
 |-------|------|
-| C0_ungated | No auth filter, no injection defenses |
+| C0_ungated | Non-agentic baseline: relevance only, no defenses |
 | C1_postfilter | Check permissions after retrieval |
 | C2_authz_first | `pre` filter only |
-| C3_datamark | Datamark + isolation, no auth filter |
+| C3_datamark | Isolation + datamark, no auth filter |
 | C4_scanner | Heuristic injection scan only |
-| C5_combined | `pre` + scan + isolation + datamark |
-| C6_action_authz | Combined plus tool permission checks in the tool path |
+| C5_combined | Single-shot: `pre` + scan + isolation + datamark |
+| C6_action_authz | C5 plus SpiceDB checks before `send_email` |
+| C7_agentic_undefended | Agent rewrite/rerank loop, no defenses |
+| C8_agentic_combined | Agent loop plus C6 defenses |
 
-The runner sets `APP_ENV=test` unless you already set it. That means **no live DeepSeek** unless you change that. For paper-quality numbers with your VM model, you run a live job separately and still write JSON/JSONL under `experiments/results/`.
+Default scoring is **extractive** (offline). `python -m secure_rag.benchmark.runner --live` uses DeepSeek. Stale-ACL grants then revokes access before the query. Cross-turn runs a first probe and feeds those chunks into the second query.
 
 ### 10.7 Benchmark fixtures — `benchmarks/`
 

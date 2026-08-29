@@ -108,6 +108,28 @@ def datamark(chunk: str) -> str:
     return f"{DATAMARK_PREFIX}\n{chunk}\n{DATAMARK_SUFFIX}"
 
 
+def extractive_generate(contexts: list[str], *, isolate: bool) -> str:
+    """Offline stand-in for a generator when no live LLM is used.
+
+    Naive mode echoes retrieved text, so a canary in a chunk counts as attack
+    success. Isolated mode drops instruction-like lines and keeps the rest, so
+    utility markers can survive while injected canaries do not.
+    """
+    if not contexts:
+        return ""
+    if not isolate:
+        return "\n".join(contexts)
+    kept: list[str] = []
+    for chunk in contexts:
+        lines = [line for line in chunk.splitlines() if line.strip() and not heuristic_is_indirect_injection(line)]
+        if heuristic_is_indirect_injection(chunk):
+            if lines:
+                kept.append("\n".join(lines))
+            continue
+        kept.append(chunk)
+    return "\n".join(kept)
+
+
 def parse_structured_label(text: str, allowed: set[str]) -> str | None:
     """Extract a single expected label, tolerating chatty or reasoning models.
 

@@ -58,6 +58,8 @@ pytest tests -q
 python -m secure_rag.benchmark.adapters
 python -m secure_rag.benchmark.runner --repeats 1 --split test --out experiments/results/authinject_eval.json
 python -m secure_rag.benchmark.analyze experiments/results/authinject_eval.jsonl
+# Live DeepSeek (generated answers, not extractive):
+# python -m secure_rag.benchmark.runner --live --repeats 3 --split test --out experiments/results/authinject_eval_live.json
 ```
 
 Live DeepSeek runs are a release job, not CI. CI uses `APP_ENV=test`, hash embeddings, and in-memory Qdrant.

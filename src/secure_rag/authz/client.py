@@ -19,6 +19,7 @@ class AuthorizationError(RuntimeError):
 class AuthzClient(Protocol):
     def write_relationships(self, tuples: list[RelationTuple]) -> None: ...
     def delete_relationships(self, resource_type: str, resource_id: str | None = None) -> None: ...
+    def delete_tuples(self, tuples: list[RelationTuple]) -> None: ...
     def check_permission(
         self, resource_type: str, resource_id: str, permission: str, subject_type: str, subject_id: str
     ) -> bool: ...
@@ -52,6 +53,9 @@ class SpiceDBSimulator:
             }
         else:
             self.relationships = {t for t in self.relationships if t[0] != resource_type}
+
+    def delete_tuples(self, tuples: list[RelationTuple]) -> None:
+        self.relationships.difference_update(tuples)
 
     def check_permission(
         self, resource_type: str, resource_id: str, permission: str, subject_type: str, subject_id: str
@@ -147,6 +151,23 @@ class RealSpiceDBClient:
                     )
                 )
             )
+
+    def delete_tuples(self, tuples: list[RelationTuple]) -> None:
+        from authzed.api.v1 import ObjectReference, Relationship, RelationshipUpdate, SubjectReference, WriteRelationshipsRequest
+
+        updates = [
+            RelationshipUpdate(
+                operation=RelationshipUpdate.Operation.OPERATION_DELETE,
+                relationship=Relationship(
+                    resource=ObjectReference(object_type=r_type, object_id=r_id),
+                    relation=rel,
+                    subject=SubjectReference(object=ObjectReference(object_type=s_type, object_id=s_id)),
+                ),
+            )
+            for r_type, r_id, rel, s_type, s_id in tuples
+        ]
+        if updates:
+            self.client.WriteRelationships(WriteRelationshipsRequest(updates=updates))
 
     def check_permission(
         self, resource_type: str, resource_id: str, permission: str, subject_type: str, subject_id: str
