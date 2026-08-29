@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from secure_rag.agent.llm import LLMBudget, LLMError, invoke_text, strip_reasoning
 from secure_rag.settings import Settings, get_settings
+
+if TYPE_CHECKING:
+    from secure_rag.agent.llm import LLMBudget
 
 INDIRECT_INJECTION_REGEXES = [
     re.compile(
@@ -49,6 +52,8 @@ def heuristic_is_indirect_injection(chunk: str) -> bool:
 
 
 def llm_is_indirect_injection(chunk: str, budget: LLMBudget | None = None, settings: Settings | None = None) -> bool:
+    from secure_rag.agent.llm import LLMError, invoke_text
+
     settings = settings or get_settings()
     prompt = (
         "Classify the document snippet. Reply with exactly SAFE or INJECTION.\n"
@@ -139,7 +144,13 @@ def parse_structured_label(text: str, allowed: set[str]) -> str | None:
 
     Returns None when the verdict is absent or ambiguous so callers can fail closed.
     """
-    cleaned = strip_reasoning(text or "")
+    cleaned = text or ""
+    try:
+        from secure_rag.agent.llm import strip_reasoning
+
+        cleaned = strip_reasoning(text or "")
+    except Exception:
+        cleaned = text or ""
     if not cleaned:
         return None
     tokens = [token.strip(".,:;!\"'`*").upper() for token in cleaned.split()]

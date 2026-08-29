@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlparse
 
-from secure_rag.agent.guardrails import heuristic_is_indirect_injection, llm_is_indirect_injection
+from secure_rag.agent.guardrails import heuristic_is_indirect_injection
 from secure_rag.benchmark.guardrail_dataset import build_held_out_samples
 from secure_rag.settings import get_settings
 
@@ -144,6 +144,8 @@ def _guardrails_predict() -> Callable[[str], bool]:
 
 
 def _repo_llm_predict() -> Callable[[str], bool]:
+    from secure_rag.agent.guardrails import llm_is_indirect_injection
+
     settings = get_settings()
     if not _loopback_url(settings.llm_base_url):
         raise RuntimeError("repository LLM classifier is only run against a loopback LLM_BASE_URL")
