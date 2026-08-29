@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import importlib.metadata
 import json
+import logging
 import os
 import platform
 import socket
@@ -161,6 +162,7 @@ def _llm_guard_predict(threshold: float) -> Callable[[str], bool]:
         from llm_guard.input_scanners import PromptInjection
         from llm_guard.input_scanners.prompt_injection import MatchType
 
+        logging.getLogger("llm_guard").setLevel(logging.ERROR)
         scanner = PromptInjection(threshold=threshold, match_type=MatchType.FULL, use_onnx=False)
 
         def predict(text: str) -> bool:
@@ -176,13 +178,6 @@ def _llm_guard_predict(threshold: float) -> Callable[[str], bool]:
         return predict
     except Exception:
         return _hf_injection_pipeline(LLM_GUARD_MODEL, threshold)
-
-
-def _guardrails_predict() -> Callable[[str], bool]:
-    raise RuntimeError(
-        "Guardrails DetectPromptInjection/Rebuff requires a Pinecone index (and typically OpenAI). "
-        "That sends retrieved-context samples to a hosted vector store, so it is not executed."
-    )
 
 
 def _repo_llm_predict() -> Callable[[str], bool]:
@@ -249,52 +244,43 @@ def run_comparison(*, n_pos: int = 40, n_neg: int = 40, llm_guard_threshold: flo
             "error": _exception_blob(exc),
         }
 
+    implementations["guardrails_ai_detect_prompt_injection"] = {
+        "status": "unsupported",
+        "component": "guardrails_ai.detect_prompt_injection.DetectPromptInjection",
+        "error": (
+            "Requires Rebuff plus a Pinecone index. Not executed so InjecAgent retrieved-context "
+            "samples are not sent to a hosted vector store."
+        ),
+    }
+
     try:
-        implementations["guardrails_ai_detect_prompt_injection"] = {
-            **_run_scanner("guardrails_ai_detect_prompt_injection", _guardrails_predict(), samples),
-            "component": "guardrails_ai.detect_prompt_injection.DetectPromptInjection",
-            "framework_version": f"guardrails-ai-detect-prompt-injection=={_pkg_version('guardrails-ai-detect-prompt-injection')}",
-            "model": "rebuff DetectPromptInjection",
-            "threshold": None,
-            "configuration": {"on_fail": "noop", "hosted_apis": False},
+        implementations["huggingface_fmops_prompt_injection"] = {
+            **_run_scanner(
+                "huggingface_fmops_prompt_injection",
+                _hf_injection_pipeline(FMOPS_INJECTION_MODEL, llm_guard_threshold),
+                samples,
+            ),
+            "component": "transformers.pipeline text-classification",
+            "framework_version": f"transformers=={_pkg_version('transformers')}",
+            "model": FMOPS_INJECTION_MODEL,
+            "threshold": llm_guard_threshold,
+            "configuration": {
+                "role": "local substitute for Guardrails DetectPromptInjection",
+                "reason": (
+                    "Guardrails DetectPromptInjection requires Rebuff plus a Pinecone index "
+                    "(hosted). Samples stay on-box, so this published DistilBERT injection "
+                    "classifier is the second local baseline instead."
+                ),
+                "hosted_apis": False,
+            },
         }
     except Exception as exc:
-        implementations["guardrails_ai_detect_prompt_injection"] = {
+        implementations["huggingface_fmops_prompt_injection"] = {
             "status": "unsupported",
-            "component": "guardrails_ai.detect_prompt_injection.DetectPromptInjection",
+            "component": "transformers.pipeline",
+            "model": FMOPS_INJECTION_MODEL,
             "error": _exception_blob(exc),
         }
-
-    guardrails_ok = implementations.get("guardrails_ai_detect_prompt_injection", {}).get("status") == "executed"
-    if not guardrails_ok:
-        try:
-            implementations["huggingface_fmops_prompt_injection"] = {
-                **_run_scanner(
-                    "huggingface_fmops_prompt_injection",
-                    _hf_injection_pipeline(FMOPS_INJECTION_MODEL, llm_guard_threshold),
-                    samples,
-                ),
-                "component": "transformers.pipeline text-classification",
-                "framework_version": f"transformers=={_pkg_version('transformers')}",
-                "model": FMOPS_INJECTION_MODEL,
-                "threshold": llm_guard_threshold,
-                "configuration": {
-                    "role": "local substitute for Guardrails DetectPromptInjection",
-                    "reason": (
-                        "Guardrails DetectPromptInjection requires Rebuff plus a Pinecone index "
-                        "(hosted). Samples stay on-box, so this published DistilBERT injection "
-                        "classifier is the second local baseline instead."
-                    ),
-                    "hosted_apis": False,
-                },
-            }
-        except Exception as exc:
-            implementations["huggingface_fmops_prompt_injection"] = {
-                "status": "unsupported",
-                "component": "transformers.pipeline",
-                "model": FMOPS_INJECTION_MODEL,
-                "error": _exception_blob(exc),
-            }
 
     if os.environ.get("GUARDRAIL_COMPARE_REPO_LLM") == "1":
         try:
