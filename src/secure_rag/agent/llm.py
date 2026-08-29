@@ -43,7 +43,13 @@ def invoke_text(prompt: str, budget: LLMBudget | None = None, settings: Settings
         message = chat_llm(settings).invoke(prompt)
         return str(getattr(message, "content", message)).strip()
     except Exception as exc:
+        logger.error(
+            "LLM call failed against %s model=%s: %s: %s",
+            settings.llm_base_url,
+            settings.llm_model,
+            type(exc).__name__,
+            exc,
+        )
         if settings.llm_fail_closed:
-            raise LLMError("LLM invocation failed") from exc
-        logger.warning("LLM failed open: %s", exc)
+            raise LLMError(f"LLM invocation failed ({type(exc).__name__}: {exc})") from exc
         return ""
