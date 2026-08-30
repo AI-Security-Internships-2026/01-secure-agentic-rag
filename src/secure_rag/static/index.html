@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AuthInject-RAG chatbot</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: #0b1220;
+        color: #e5e7eb;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 48px 20px 120px;
+      }
+      code,
+      pre {
+        background: #111827;
+        border-radius: 8px;
+      }
+      code {
+        padding: 2px 6px;
+      }
+      pre {
+        padding: 14px;
+        overflow: auto;
+      }
+      h1 {
+        margin-bottom: 8px;
+      }
+      .muted {
+        color: #9ca3af;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>AuthInject-RAG</h1>
+      <p class="muted">
+        Authorization-first RAG with indirect prompt-injection defenses, exposed as a chatbot
+        you can embed on a website or drive from the CLI.
+      </p>
+      <h2>Embed on your site</h2>
+      <p>Point visitors at this API, ingest documents as the widget user, then drop in:</p>
+      <pre><code>&lt;script
+  src="https://YOUR_HOST/static/widget.js"
+  data-api-url="https://YOUR_HOST"
+  data-site-key="YOUR_SITE_KEY"
+  defer&gt;&lt;/script&gt;</code></pre>
+      <h2>CLI</h2>
+      <pre><code>secure-rag
+secure-rag --once "What is dual control?"
+secure-rag --api http://127.0.0.1:8080 --site-key YOUR_SITE_KEY</code></pre>
+      <p class="muted">The launcher on this page talks to the same origin using your configured site key.</p>
+    </main>
+    <script src="/static/widget.js" data-api-url="" defer></script>
+  </body>
+</html>

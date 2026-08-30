@@ -12,6 +12,15 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+    # Comma-separated origins for the embeddable widget. Use * only in development.
+    cors_origins: str = "*"
+
+    widget_enabled: bool = True
+    widget_site_key: str = ""
+    widget_user_id: str = "site-bot"
+    widget_tenant_id: str = "default"
+    widget_title: str = "Assistant"
+    widget_welcome: str = "Ask a question about the knowledge base."
 
     jwt_secret: str = Field(default="change-me-to-a-long-random-secret")
     jwt_algorithm: str = "HS256"

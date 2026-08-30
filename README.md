@@ -42,6 +42,47 @@ Run API and CLI:
 ```bash
 uvicorn secure_rag.api.app:app --port 8080
 secure-rag
+secure-rag --once "What dual control is required?"
+secure-rag --api http://127.0.0.1:8080
+```
+
+The API also serves a demo chat page at `/` and an embeddable widget at `/static/widget.js`.
+
+## Website chatbot
+
+Keep authorization-first retrieval and injection defenses on the server. Your site only sends messages.
+
+1. Set a site key and the identity that owns the public knowledge base:
+
+```env
+CORS_ORIGINS=https://your-website.com
+WIDGET_SITE_KEY=replace-with-a-long-random-key
+WIDGET_USER_ID=site-bot
+WIDGET_TENANT_ID=default
+WIDGET_TITLE=Support
+```
+
+2. Ingest documents as that user (CLI or `POST /ingest` with a JWT for `site-bot`).
+
+3. Drop this snippet on the website:
+
+```html
+<script
+  src="https://YOUR_RAG_HOST/static/widget.js"
+  data-api-url="https://YOUR_RAG_HOST"
+  data-site-key="YOUR_SITE_KEY"
+  defer></script>
+```
+
+The widget calls `POST /chat` with `X-Site-Key`. That key can chat only; ingest and permission APIs still require a JWT. Logged-in users can instead pass `data-token` with a tenant-scoped bearer token.
+
+From a backend (Next.js, etc.) use the Python client:
+
+```python
+from secure_rag.sdk import AuthInjectClient
+
+client = AuthInjectClient("https://YOUR_RAG_HOST", site_key="YOUR_SITE_KEY")
+print(client.chat("How do I reset my password?")["reply"])
 ```
 
 Mint a development token (`/token` is disabled when `APP_ENV=production`):

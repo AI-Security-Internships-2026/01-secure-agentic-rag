@@ -67,3 +67,6 @@ chroma_db/
 chromadb/
 qdrant_storage/
 benchmarks/.cache/
+
+# Local paper drafts — keep LaTeX and Overleaf artifacts out of git
+paper/
