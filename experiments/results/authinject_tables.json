@@ -4,6 +4,7 @@
     "unauthorized_context_exposure": {
       "rate": 1.0,
       "count": 20,
+      "denominator": 20,
       "ci95": [
         0.8388698745050668,
         0.9999999999999999
@@ -12,6 +13,7 @@
     "authorization_violation": {
       "rate": 1.0,
       "count": 20,
+      "denominator": 20,
       "ci95": [
         0.8388698745050668,
         0.9999999999999999
@@ -20,22 +22,25 @@
     "xpia_success": {
       "rate": 0.45,
       "count": 9,
+      "denominator": 20,
       "ci95": [
         0.25819502085709295,
         0.6579179916924003
       ]
     },
     "tool_action_asr": {
-      "rate": 0.05,
-      "count": 1,
+      "rate": 1.0,
+      "count": 3,
+      "denominator": 3,
       "ci95": [
-        0.008881219432873136,
-        0.23613589351256675
+        0.43849391955098227,
+        1.0
       ]
     },
     "utility_hit": {
       "rate": 1.0,
       "count": 20,
+      "denominator": 20,
       "ci95": [
         0.8388698745050668,
         0.9999999999999999
@@ -44,6 +49,7 @@
     "false_block": {
       "rate": 0.0,
       "count": 0,
+      "denominator": 20,
       "ci95": [
         0.0,
         0.1611301254949332
@@ -52,10 +58,15 @@
     "combined_failure": {
       "rate": 1.0,
       "count": 20,
+      "denominator": 20,
       "ci95": [
         0.8388698745050668,
         0.9999999999999999
       ]
+    },
+    "latency_ms": {
+      "mean": 149.64831999895978,
+      "n": 20
     }
   },
   "C1_postfilter": {
@@ -63,6 +74,7 @@
     "unauthorized_context_exposure": {
       "rate": 0.0,
       "count": 0,
+      "denominator": 20,
       "ci95": [
         0.0,
         0.1611301254949332
@@ -71,6 +83,7 @@
     "authorization_violation": {
       "rate": 0.0,
       "count": 0,
+      "denominator": 20,
       "ci95": [
         0.0,
         0.1611301254949332
@@ -79,22 +92,25 @@
     "xpia_success": {
       "rate": 0.15,
       "count": 3,
+      "denominator": 20,
       "ci95": [
         0.05236779195949584,
         0.36042329588695743
       ]
     },
     "tool_action_asr": {
-      "rate": 0.05,
-      "count": 1,
+      "rate": 1.0,
+      "count": 3,
+      "denominator": 3,
       "ci95": [
-        0.008881219432873136,
-        0.23613589351256675
+        0.43849391955098227,
+        1.0
       ]
     },
     "utility_hit": {
       "rate": 1.0,
       "count": 20,
+      "denominator": 20,
       "ci95": [
         0.8388698745050668,
         0.9999999999999999
@@ -103,18 +119,24 @@
     "false_block": {
       "rate": 0.0,
       "count": 0,
+      "denominator": 20,
       "ci95": [
         0.0,
         0.1611301254949332
       ]
     },
     "combined_failure": {
-      "rate": 0.2,
-      "count": 4,
+      "rate": 0.3,
+      "count": 6,
+      "denominator": 20,
       "ci95": [
-        0.0806563532712,
-        0.41602172202575993
+        0.14547527396899385,
+        0.5189767762289793
       ]
+    },
+    "latency_ms": {
+      "mean": 25.38313999939419,
+      "n": 20
     }
   },
   "C2_authz_first": {
@@ -122,6 +144,7 @@
     "unauthorized_context_exposure": {
       "rate": 0.0,
       "count": 0,
+      "denominator": 20,
       "ci95": [
         0.0,
         0.1611301254949332
@@ -130,6 +153,7 @@
     "authorization_violation": {
       "rate": 0.0,
       "count": 0,
+      "denominator": 20,
       "ci95": [
         0.0,
         0.1611301254949332
@@ -138,22 +162,25 @@
     "xpia_success": {
       "rate": 0.15,
       "count": 3,
+      "denominator": 20,
       "ci95": [
         0.05236779195949584,
         0.36042329588695743
       ]
     },
     "tool_action_asr": {
-      "rate": 0.05,
-      "count": 1,
+      "rate": 1.0,
+      "count": 3,
+      "denominator": 3,
       "ci95": [
-        0.008881219432873136,
-        0.23613589351256675
+        0.43849391955098227,
+        1.0
       ]
     },
     "utility_hit": {
       "rate": 1.0,
       "count": 20,
+      "denominator": 20,
       "ci95": [
         0.8388698745050668,
         0.9999999999999999
@@ -162,18 +189,24 @@
     "false_block": {
       "rate": 0.0,
       "count": 0,
+      "denominator": 20,
       "ci95": [
         0.0,
         0.1611301254949332
       ]
     },
     "combined_failure": {
-      "rate": 0.2,
-      "count": 4,
+      "rate": 0.3,
+      "count": 6,
+      "denominator": 20,
       "ci95": [
-        0.0806563532712,
-        0.41602172202575993
+        0.14547527396899385,
+        0.5189767762289793
       ]
+    },
+    "latency_ms": {
+      "mean": 27.395249999608495,
+      "n": 20
     }
   },
   "C3_datamark": {
@@ -181,6 +214,7 @@
     "unauthorized_context_exposure": {
       "rate": 1.0,
       "count": 20,
+      "denominator": 20,
       "ci95": [
         0.8388698745050668,
         0.9999999999999999
@@ -189,6 +223,287 @@
     "authorization_violation": {
       "rate": 1.0,
       "count": 20,
+      "denominator": 20,
+      "ci95": [
+        0.8388698745050668,
+        0.9999999999999999
+      ]
+    },
+    "xpia_success": {
+      "rate": 0.0,
+      "count": 0,
+      "denominator": 20,
+      "ci95": [
+        0.0,
+        0.1611301254949332
+      ]
+    },
+    "tool_action_asr": {
+      "rate": 1.0,
+      "count": 3,
+      "denominator": 3,
+      "ci95": [
+        0.43849391955098227,
+        1.0
+      ]
+    },
+    "utility_hit": {
+      "rate": 0.55,
+      "count": 11,
+      "denominator": 20,
+      "ci95": [
+        0.3420820083075997,
+        0.7418049791429071
+      ]
+    },
+    "false_block": {
+      "rate": 0.0,
+      "count": 0,
+      "denominator": 20,
+      "ci95": [
+        0.0,
+        0.1611301254949332
+      ]
+    },
+    "combined_failure": {
+      "rate": 1.0,
+      "count": 20,
+      "denominator": 20,
+      "ci95": [
+        0.8388698745050668,
+        0.9999999999999999
+      ]
+    },
+    "latency_ms": {
+      "mean": 47.08996000044863,
+      "n": 20
+    }
+  },
+  "C4_scanner": {
+    "n": 20,
+    "unauthorized_context_exposure": {
+      "rate": 1.0,
+      "count": 20,
+      "denominator": 20,
+      "ci95": [
+        0.8388698745050668,
+        0.9999999999999999
+      ]
+    },
+    "authorization_violation": {
+      "rate": 1.0,
+      "count": 20,
+      "denominator": 20,
+      "ci95": [
+        0.8388698745050668,
+        0.9999999999999999
+      ]
+    },
+    "xpia_success": {
+      "rate": 0.0,
+      "count": 0,
+      "denominator": 20,
+      "ci95": [
+        0.0,
+        0.1611301254949332
+      ]
+    },
+    "tool_action_asr": {
+      "rate": 1.0,
+      "count": 3,
+      "denominator": 3,
+      "ci95": [
+        0.43849391955098227,
+        1.0
+      ]
+    },
+    "utility_hit": {
+      "rate": 0.55,
+      "count": 11,
+      "denominator": 20,
+      "ci95": [
+        0.3420820083075997,
+        0.7418049791429071
+      ]
+    },
+    "false_block": {
+      "rate": 0.0,
+      "count": 0,
+      "denominator": 20,
+      "ci95": [
+        0.0,
+        0.1611301254949332
+      ]
+    },
+    "combined_failure": {
+      "rate": 1.0,
+      "count": 20,
+      "denominator": 20,
+      "ci95": [
+        0.8388698745050668,
+        0.9999999999999999
+      ]
+    },
+    "latency_ms": {
+      "mean": 68.21232500042242,
+      "n": 20
+    }
+  },
+  "C5_combined": {
+    "n": 20,
+    "unauthorized_context_exposure": {
+      "rate": 0.0,
+      "count": 0,
+      "denominator": 20,
+      "ci95": [
+        0.0,
+        0.1611301254949332
+      ]
+    },
+    "authorization_violation": {
+      "rate": 0.0,
+      "count": 0,
+      "denominator": 20,
+      "ci95": [
+        0.0,
+        0.1611301254949332
+      ]
+    },
+    "xpia_success": {
+      "rate": 0.0,
+      "count": 0,
+      "denominator": 20,
+      "ci95": [
+        0.0,
+        0.1611301254949332
+      ]
+    },
+    "tool_action_asr": {
+      "rate": 1.0,
+      "count": 3,
+      "denominator": 3,
+      "ci95": [
+        0.43849391955098227,
+        1.0
+      ]
+    },
+    "utility_hit": {
+      "rate": 0.55,
+      "count": 11,
+      "denominator": 20,
+      "ci95": [
+        0.3420820083075997,
+        0.7418049791429071
+      ]
+    },
+    "false_block": {
+      "rate": 0.0,
+      "count": 0,
+      "denominator": 20,
+      "ci95": [
+        0.0,
+        0.1611301254949332
+      ]
+    },
+    "combined_failure": {
+      "rate": 0.15,
+      "count": 3,
+      "denominator": 20,
+      "ci95": [
+        0.05236779195949584,
+        0.36042329588695743
+      ]
+    },
+    "latency_ms": {
+      "mean": 62.49787499982631,
+      "n": 20
+    }
+  },
+  "C6_action_authz": {
+    "n": 20,
+    "unauthorized_context_exposure": {
+      "rate": 0.0,
+      "count": 0,
+      "denominator": 20,
+      "ci95": [
+        0.0,
+        0.1611301254949332
+      ]
+    },
+    "authorization_violation": {
+      "rate": 0.0,
+      "count": 0,
+      "denominator": 20,
+      "ci95": [
+        0.0,
+        0.1611301254949332
+      ]
+    },
+    "xpia_success": {
+      "rate": 0.0,
+      "count": 0,
+      "denominator": 20,
+      "ci95": [
+        0.0,
+        0.1611301254949332
+      ]
+    },
+    "tool_action_asr": {
+      "rate": 0.0,
+      "count": 0,
+      "denominator": 3,
+      "ci95": [
+        0.0,
+        0.5615060804490177
+      ]
+    },
+    "utility_hit": {
+      "rate": 0.55,
+      "count": 11,
+      "denominator": 20,
+      "ci95": [
+        0.3420820083075997,
+        0.7418049791429071
+      ]
+    },
+    "false_block": {
+      "rate": 0.0,
+      "count": 0,
+      "denominator": 20,
+      "ci95": [
+        0.0,
+        0.1611301254949332
+      ]
+    },
+    "combined_failure": {
+      "rate": 0.0,
+      "count": 0,
+      "denominator": 20,
+      "ci95": [
+        0.0,
+        0.1611301254949332
+      ]
+    },
+    "latency_ms": {
+      "mean": 64.34274499915773,
+      "n": 20
+    }
+  },
+  "C7_agentic_undefended": {
+    "n": 20,
+    "unauthorized_context_exposure": {
+      "rate": 1.0,
+      "count": 20,
+      "denominator": 20,
+      "ci95": [
+        0.8388698745050668,
+        0.9999999999999999
+      ]
+    },
+    "authorization_violation": {
+      "rate": 1.0,
+      "count": 20,
+      "denominator": 20,
       "ci95": [
         0.8388698745050668,
         0.9999999999999999
@@ -197,22 +512,25 @@
     "xpia_success": {
       "rate": 0.45,
       "count": 9,
+      "denominator": 20,
       "ci95": [
         0.25819502085709295,
         0.6579179916924003
       ]
     },
     "tool_action_asr": {
-      "rate": 0.05,
-      "count": 1,
+      "rate": 1.0,
+      "count": 3,
+      "denominator": 3,
       "ci95": [
-        0.008881219432873136,
-        0.23613589351256675
+        0.43849391955098227,
+        1.0
       ]
     },
     "utility_hit": {
       "rate": 1.0,
       "count": 20,
+      "denominator": 20,
       "ci95": [
         0.8388698745050668,
         0.9999999999999999
@@ -221,6 +539,7 @@
     "false_block": {
       "rate": 0.0,
       "count": 0,
+      "denominator": 20,
       "ci95": [
         0.0,
         0.1611301254949332
@@ -229,76 +548,23 @@
     "combined_failure": {
       "rate": 1.0,
       "count": 20,
+      "denominator": 20,
       "ci95": [
         0.8388698745050668,
         0.9999999999999999
       ]
+    },
+    "latency_ms": {
+      "mean": 55.99894500046503,
+      "n": 20
     }
   },
-  "C4_scanner": {
-    "n": 20,
-    "unauthorized_context_exposure": {
-      "rate": 1.0,
-      "count": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "authorization_violation": {
-      "rate": 1.0,
-      "count": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "xpia_success": {
-      "rate": 0.0,
-      "count": 0,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "tool_action_asr": {
-      "rate": 0.05,
-      "count": 1,
-      "ci95": [
-        0.008881219432873136,
-        0.23613589351256675
-      ]
-    },
-    "utility_hit": {
-      "rate": 0.55,
-      "count": 11,
-      "ci95": [
-        0.3420820083075997,
-        0.7418049791429071
-      ]
-    },
-    "false_block": {
-      "rate": 0.0,
-      "count": 0,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "combined_failure": {
-      "rate": 1.0,
-      "count": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    }
-  },
-  "C5_combined": {
+  "C8_agentic_combined": {
     "n": 20,
     "unauthorized_context_exposure": {
       "rate": 0.0,
       "count": 0,
+      "denominator": 20,
       "ci95": [
         0.0,
         0.1611301254949332
@@ -307,6 +573,7 @@
     "authorization_violation": {
       "rate": 0.0,
       "count": 0,
+      "denominator": 20,
       "ci95": [
         0.0,
         0.1611301254949332
@@ -315,22 +582,25 @@
     "xpia_success": {
       "rate": 0.0,
       "count": 0,
+      "denominator": 20,
       "ci95": [
         0.0,
         0.1611301254949332
       ]
     },
     "tool_action_asr": {
-      "rate": 0.05,
-      "count": 1,
+      "rate": 0.0,
+      "count": 0,
+      "denominator": 3,
       "ci95": [
-        0.008881219432873136,
-        0.23613589351256675
+        0.0,
+        0.5615060804490177
       ]
     },
     "utility_hit": {
       "rate": 0.55,
       "count": 11,
+      "denominator": 20,
       "ci95": [
         0.3420820083075997,
         0.7418049791429071
@@ -339,77 +609,24 @@
     "false_block": {
       "rate": 0.0,
       "count": 0,
+      "denominator": 20,
       "ci95": [
         0.0,
         0.1611301254949332
       ]
     },
     "combined_failure": {
-      "rate": 0.05,
-      "count": 1,
-      "ci95": [
-        0.008881219432873136,
-        0.23613589351256675
-      ]
-    }
-  },
-  "C6_action_authz": {
-    "n": 20,
-    "unauthorized_context_exposure": {
       "rate": 0.0,
       "count": 0,
+      "denominator": 20,
       "ci95": [
         0.0,
         0.1611301254949332
       ]
     },
-    "authorization_violation": {
-      "rate": 0.0,
-      "count": 0,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "xpia_success": {
-      "rate": 0.0,
-      "count": 0,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "tool_action_asr": {
-      "rate": 0.05,
-      "count": 1,
-      "ci95": [
-        0.008881219432873136,
-        0.23613589351256675
-      ]
-    },
-    "utility_hit": {
-      "rate": 0.55,
-      "count": 11,
-      "ci95": [
-        0.3420820083075997,
-        0.7418049791429071
-      ]
-    },
-    "false_block": {
-      "rate": 0.0,
-      "count": 0,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "combined_failure": {
-      "rate": 0.05,
-      "count": 1,
-      "ci95": [
-        0.008881219432873136,
-        0.23613589351256675
-      ]
+    "latency_ms": {
+      "mean": 55.77652000065427,
+      "n": 20
     }
   }
 }

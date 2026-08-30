@@ -11,6 +11,14 @@ Negative class = the same templates filled with the paper’s own user instructi
 
 This is **retrieved-context validation**, not user-query jailbreak classification, not PII detection, and not tool-trace alignment.
 
+The original Week 8 `experiments/run_guardrail_comparison.py` used copied
+NeMo-style and Meta-style prompts while naming them as frameworks. That was not
+a technically valid framework comparison. The command is retained as a
+compatibility entry point, but it now invokes this maintained same-task
+benchmark. The historical 60%→0% generation-hijack result is a different
+experiment and remains reproducible through
+`experiments/run_indirect_injection_eval.py`.
+
 ## Implementations
 
 | Name | Component | Role |
@@ -64,6 +72,8 @@ If you already installed into `.venv` and just want the JSON now:
 cd ~/01-secure-agentic-rag
 source .venv/bin/activate
 python -m secure_rag.benchmark.guardrail_compare --out experiments/results/guardrail_comparison.json
+# Equivalent compatibility command:
+python experiments/run_guardrail_comparison.py --out experiments/results/guardrail_comparison.json
 ```
 
 First LLM Guard run downloads `protectai/deberta-v3-base-prompt-injection-v2` from Hugging Face to the local cache. Samples are classified on CPU/GPU locally.

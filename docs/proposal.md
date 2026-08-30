@@ -12,6 +12,20 @@ Enterprise RAG ranks by similarity, not authorization (Arceo and Narsing, 2026).
 
 A junior analyst can retrieve a semantically similar document from another tenant, or an authorized document can carry instructions that hijack generation and tool use. Retrieve-then-filter leaks unauthorized text into model context before any downstream check (Authorization-First Retrieval, TrustNLP 2026). Prompt isolation cannot restore a permission that was never enforced.
 
+### 2.1 Scope evolution
+
+The original August roadmap targeted indirect prompt injection carried in
+retrieved documents, not malicious user queries. Week 8 delivered the threat
+model, heuristic and LLM chunk scanning, context isolation, a 10+10 canary
+fixture, and a model-dependent before/after ASR result.
+
+Week 9 extended that work after identifying authorization as an independent
+failure boundary. AuthInject-RAG therefore measures both structural exposure of
+forbidden chunks and behavioral hijack by authorized poisoned chunks. The
+original retrieved-document threat remains the allowed-poison/XPIA axis and the
+historical direct-context experiment; it was not replaced by cross-tenant
+evaluation.
+
 ## 3. Research questions
 
 1. Does authorization-first candidate restriction drive unauthorized context exposure to zero under cross-tenant probes?
@@ -23,7 +37,7 @@ A junior analyst can retrieve a semantically similar document from another tenan
 ### 4.1 Data
 
 - Combined AuthInject fixture derived from OGX tenant design (MIT), AgentDojo/InjecAgent attack families (MIT), and BIPIA isolation patterns (code MIT; only license-cleared subsets).
-- Smoke set: `experiments/datasets/adversarial_indirect_injection.json` (n=20), not used for paper claims.
+- Historical direct-context set: `experiments/datasets/adversarial_indirect_injection.json` (n=20); retained for the Week 8 ASR result, but not used for the joint paper table.
 
 ### 4.2 Approach
 

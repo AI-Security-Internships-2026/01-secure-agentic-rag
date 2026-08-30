@@ -3,7 +3,7 @@ from secure_rag.agent.guardrails import extractive_generate
 from secure_rag.agent.tools import execute_tool
 from secure_rag.authz.client import get_authz_client, reset_authz_client
 from secure_rag.benchmark.adapters import build_authinject_cases
-from secure_rag.benchmark.runner import CONFIGS, run_case, _load_cases
+from secure_rag.benchmark.runner import CONFIGS, _load_cases, run_case
 from secure_rag.retrieval.ingest import ingest_texts
 from secure_rag.retrieval.qdrant_store import reset_vector_store
 
@@ -95,3 +95,6 @@ def test_runner_stale_and_tool_cases_score():
     guarded = run_case(tool_case, CONFIGS["C6_action_authz"], payload, "extractive")
     assert undefended["tool_action_asr"] == 1
     assert guarded["tool_action_asr"] == 0
+    assert undefended["tool_authorization_enforced"] is False
+    assert guarded["tool_authorization_enforced"] is True
+    assert guarded["tool_allowed"] is False

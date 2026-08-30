@@ -1,6 +1,12 @@
 # Task Execution and Results Summary
 
-> Historical lab notebook (August 2026). Paths such as `src/data_functions/` and `experiments/run_indirect_injection_eval.py` no longer exist. Current code is `src/secure_rag/`; current eval is `python -m secure_rag.benchmark.runner`.
+> Historical lab notebook (August 2026), retained as a separate evaluation
+> track. The application implementation moved from `src/data_functions/` to
+> `src/secure_rag/agent/`, but
+> `python experiments/run_indirect_injection_eval.py` is again executable and
+> writes `experiments/results/indirect_injection_eval.json`. The newer C0--C8
+> authorization-plus-injection evaluation is additive and runs with
+> `python -m secure_rag.benchmark.runner`.
 
 **Project:** Kubernetes Native Secure Agentic RAG  
 **Scope:** README milestones for 9 Aug 2026 and 16 Aug 2026  
@@ -49,7 +55,10 @@ Related follow-ups that were required to finish the eval (not extra roadmap item
 
 **Goal.** Stop retrieved payloads from reaching (or steering) the generator, with a cheap first line of defense.
 
-**How it was done.** Work landed in [`src/data_functions/query_engine.py`](../src/data_functions/query_engine.py).
+**How it was done.** The maintained implementation is
+[`src/secure_rag/agent/guardrails.py`](../src/secure_rag/agent/guardrails.py);
+the LangGraph integration is in
+[`src/secure_rag/agent/graph.py`](../src/secure_rag/agent/graph.py).
 
 | Layer | What runs | When | Local / online |
 |---|---|---|---|
@@ -82,7 +91,7 @@ Related follow-ups that were required to finish the eval (not extra roadmap item
 **Unit tests (no Groq required for the heuristic).**
 
 ```bash
-python -m unittest tests.test_indirect_injection tests.test_query_engine.TestQueryEngine.test_query_rag_system_with_indirect_injection
+python -m pytest tests/test_indirect_injection.py tests/test_guardrails.py
 ```
 
 [`tests/test_indirect_injection.py`](../tests/test_indirect_injection.py) checks regex true/false positives on the dataset, chunk dropping without an LLM, and the empty-context block message. The existing LangGraph mock test still checks that a poisoned chunk is discarded and the diagnostic flag stays set.
@@ -95,7 +104,10 @@ python -m unittest tests.test_indirect_injection tests.test_query_engine.TestQue
 
 **How it was done.** A small synthetic JSON set was written by hand (cybersecurity-themed). No external dataset download.
 
-**Product.** [`experiments/datasets/adversarial_indirect_injection.json`](../experiments/datasets/adversarial_indirect_injection.json)
+**Product.**
+[`experiments/datasets/adversarial_indirect_injection.json`](../experiments/datasets/adversarial_indirect_injection.json).
+An identical copy remains under `tests/fixtures/` for offline unit tests; a
+regression test prevents the two copies from drifting.
 
 | Split | N | Query | Document | Success criterion |
 |---|---|---|---|---|
@@ -154,9 +166,18 @@ API errors are excluded from the denominator so a failed HTTP call cannot look l
 
 **Goal.** Compare the repository's prompt-injection and PII controls with representative LLM prompt and local validator patterns on labeled samples.
 
-**How it was executed.** `experiments/run_guardrail_comparison.py` evaluates 20 prompt-injection samples and 20 PII/secret samples. It calls the configured OpenAI-compatible LLM endpoint for the repository, NeMo-style, and Meta-style prompt-injection predictors. Presidio runs locally for the repository PII check, and the validator comparison uses local regular expressions.
+**Historical execution.** The August 19 script evaluated 20 prompt-injection
+queries and 20 PII/secret samples with repository, NeMo-style, Meta-style, and
+validator-style prompts. Those entries were prompt-pattern approximations, not
+executions of complete NeMo, LlamaFirewall, or Guardrails AI frameworks.
 
-The benchmark does not use ChromaDB because it tests classification and sanitization directly, not embedding retrieval or document ranking. The NeMo, Meta, and Guardrails AI entries are representative prompt/validator patterns in this script, not claims that the full external frameworks or separate models were installed and executed.
+**Maintained execution.**
+`experiments/run_guardrail_comparison.py` is now a compatibility entry point to
+`python -m secure_rag.benchmark.guardrail_compare`. The maintained benchmark
+uses the same 80 InjecAgent-derived retrieved-context samples for the repository
+heuristic, ProtectAI LLM Guard, and FMOPS DistilBERT. Components that were not
+installed, require hosted services, or perform a different function are marked
+`not_comparable`; they are not represented by copied prompts.
 
 It records true/false positives and negatives, precision, recall, F1, false-positive and false-negative rates, median and p95 latency, throughput, and failures.
 
@@ -171,11 +192,11 @@ It records true/false positives and negatives, precision, recall, F1, false-posi
 | `docs/threat_model.md` | Threat definition, assets, adversary, mitigations, eval protocol |
 | `docs/task-execution-summary.md` | This execution + results write-up |
 | `docs/weekly-progress.md` | Week 8 log |
-| `src/data_functions/query_engine.py` | Heuristic, scanner, isolation, toggle flags, eval helpers |
-| `experiments/datasets/adversarial_indirect_injection.json` | Poisoned vs clean set |
+| `src/secure_rag/agent/guardrails.py` | Heuristic, scanner, isolation, and restored direct-context eval helper |
+| `tests/fixtures/adversarial_indirect_injection.json` | Poisoned vs clean Week 8 set |
 | `experiments/run_indirect_injection_eval.py` | Before/after ASR runner |
 | `experiments/results/indirect_injection_eval.json` | Machine-readable scores and answer previews |
-| `experiments/run_guardrail_comparison.py` | Guardrail classification benchmark runner |
+| `experiments/run_guardrail_comparison.py` | Compatibility entry point to maintained guardrail benchmark |
 | `experiments/results/guardrail_comparison.json` | Guardrail benchmark metrics |
 | `docs/guardrail-comparison.md` | Guardrail benchmark explanation |
 | `docs/indirect-injection-evaluation.md` | Indirect-injection evaluation explanation |
@@ -233,10 +254,12 @@ Heuristic flag was **false** on all 10 clean documents (no false positive from r
 
 ## 5. How to reproduce the results
 
-Prerequisites: existing project venv, `GROQ_API_KEY`, `GROQ_MODEL=openai/gpt-oss-20b`. No `pip install` of new stacks.
+Prerequisites: the project venv and a working OpenAI-compatible endpoint in
+`LLM_BASE_URL`/`LLM_MODEL`. To approximate the historical execution, configure
+Groq with `openai/gpt-oss-20b`; a local DeepSeek/vLLM endpoint is also supported.
 
 ```bash
-python -m unittest tests.test_indirect_injection
+python -m pytest tests/test_indirect_injection.py
 python experiments/run_indirect_injection_eval.py
 ```
 
@@ -246,7 +269,7 @@ The second command overwrites `experiments/results/indirect_injection_eval.json`
 
 ## 6. Limits of this execution
 
-- The eval **injects the document as if it were already retrieved**. It does not measure whether a poisoned PDF would rank in Chroma.
+- The eval **injects the document as if it were already retrieved**. It does not measure whether a poisoned PDF would rank in the current Qdrant retrieval path.
 - Canary ASR does not cover multimodal payloads, multi-chunk majority-vote attacks, or adaptive paraphrases beyond `p09`.
 - Clean utility is a brittle keyword check, not a graded RAG quality metric (that is the 23 Aug ablation item).
-- The Groq scanner can fail open on API errors; the regex is the fail-closed first line for known patterns.
+- The maintained LLM scanner follows `LLM_FAIL_CLOSED`; the local regex remains the first line for known patterns.
