@@ -1,0 +1,18 @@
+replicaCount: 2
+image:
+  repository: authinject-rag
+  tag: "0.2.0"
+service:
+  port: 80
+  targetPort: 8000
+env:
+  APP_ENV: production
+  SPICEDB_ENDPOINT: spicedb:50051
+  QDRANT_URL: http://qdrant:6333
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 2Gi

@@ -11,6 +11,7 @@ build/
 
 # Virtual environments
 .venv/
+.venv-guardrails/
 venv/
 env/
 ENV/
@@ -27,23 +28,8 @@ Thumbs.db
 .ipynb_checkpoints/
 *.ipynb_metadata
 
-# Datasets and large files (use DVC or document sources in datasets/README.md)
+# Datasets and large files
 /datasets/
-datasets/**/*.csv
-datasets/**/*.parquet
-datasets/**/*.h5
-datasets/**/*.hdf5
-datasets/**/*.pkl
-datasets/**/*.npy
-datasets/**/*.npz
-datasets/**/*.zip
-datasets/**/*.tar.gz
-datasets/**/*.pcap
-datasets/**/*.pdf
-
-# Keep the small adversarial eval set that ships with the repo
-# !experiments/datasets/
-# !experiments/datasets/**
 
 # Model checkpoints
 *.pt
@@ -60,12 +46,16 @@ logs/
 
 # Secrets and credentials — NEVER commit these
 .env
-.env.*
+.env.local
+.env.production
 secrets/
 credentials/
 *.key
 *.pem
 *.cert
+
+# Keep the committed template
+!.env.example
 
 # Results that can be reproduced
 experiments/results/*.png
@@ -75,3 +65,5 @@ experiments/results/*.pdf
 exported_database.csv
 chroma_db/
 chromadb/
+qdrant_storage/
+benchmarks/.cache/

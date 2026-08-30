@@ -193,3 +193,92 @@ Reading papers were a problem for me. I wasn't sure about what to read. And as a
 ### Next week plan
 - Ablation of agent loop vs defenses (accuracy and robustness).
 
+---
+
+## Week 9
+
+**Branch:** `week-09`
+**PR link:** _[Add link after opening PR]_
+
+### Completed this week
+- Preserved the Week 8 threat and 10-poison/10-clean canary experiment as the
+  **retrieved-document generation-hijack track**. The original command remains
+  `python experiments/run_indirect_injection_eval.py`.
+- Extended, rather than replaced, the threat model to combine two independent
+  risks: (1) unauthorized chunks crossing a tenant boundary and (2) authorized
+  chunks containing indirect prompt injection.
+- Reorganized the prototype as the installable `secure_rag` package and replaced
+  the older Chroma/Groq-specific application path with JWT-authenticated
+  FastAPI, Qdrant payload filtering, SpiceDB ReBAC, and an OpenAI-compatible
+  local-model client.
+- Added the 92-case AuthInject fixture and C0--C6 ablation matrix. Metrics now
+  distinguish unauthorized context exposure, authorization violations, canary
+  XPIA success, tool action ASR, utility, false blocks, and combined failure.
+- Added stale-ACL and cross-turn probes, deterministic offline execution, JSONL
+  rows, Wilson 95% intervals, and CI-safe hash embeddings.
+
+### Why the scope changed
+
+The Week 8 experiment answers: “If a poisoned document is already in context,
+does the model follow it?” It does not test whether the document should have
+been retrieved. During Week 9 the project added the missing authorization
+boundary, because a prompt-injection defense cannot prevent cross-tenant
+exposure and an authorization check cannot sanitize an allowed poisoned
+document. The AuthInject benchmark is therefore a second, joint evaluation
+track—not a redefinition of indirect prompt injection.
+
+### Problems / Blockers
+- The cleanup commit removed the Week 8 runner and result while historical docs
+  still cited them. This made the 60% to 0% result non-reproducible from the
+  branch. The compatibility runner, fixture lookup, tests, and historical result
+  have now been restored.
+- Early generated tables stopped at C6 and counted every permitted tool call as
+  attack success. The action-attack corpus now contains only unauthorized tool
+  requests; positive permission behavior remains covered by a separate unit
+  test.
+
+### Next week plan
+- Add explicit with/without-agent-loop configurations and refresh all generated
+  artifacts from the same JSONL source.
+- Compare technically equivalent retrieved-context injection detectors locally.
+
+---
+
+## Week 10
+
+**Branch:** `week-10`
+**PR link:** _[Add link after opening PR]_
+
+### Completed this week
+- Added C7 (`agentic_undefended`) and C8 (`agentic_combined`) so the Aug 23
+  milestone compares the LangGraph rewrite/rerank loop with and without the
+  combined defenses. In offline test mode the LLM rewrite/rerank calls are
+  disabled, so these configurations validate wiring only; model-level loop
+  effects require the documented `--live` run.
+- Wired `enable_action_authz` through the benchmark to
+  `execute_tool(..., check_authz=True)` and recorded whether enforcement ran and
+  whether the attacked tool action was allowed. C6 and C8 now block all
+  unauthorized `send_email` attack requests in the locked test split.
+- Regenerated `authinject_eval.json`, its 180-row JSONL, and
+  `authinject_tables.json` for all C0--C8 configurations.
+- Added the separate 80-sample InjecAgent retrieved-context classifier
+  comparison with local ProtectAI LLM Guard and FMOPS DistilBERT baselines.
+  Unsupported or functionally different NeMo, LlamaFirewall, PII, and hosted
+  Pinecone components are marked not comparable rather than simulated.
+- Kept the historical `experiments/run_guardrail_comparison.py` command as a
+  compatibility entry point to the maintained benchmark; the old script's
+  “NeMo-style” and “Meta-style” prompts were not full framework executions.
+
+### Problems / Blockers
+- Guardrails AI DetectPromptInjection requires Rebuff plus a Pinecone index.
+  Sending the retrieved-context samples to a hosted vector store would violate
+  the local-data constraint, so the component was not executed.
+- The main AuthInject run is still offline: one repeat, hash embeddings,
+  in-memory Qdrant/SpiceDB simulator, and an extractive generator. Live DeepSeek
+  repeats remain a release measurement and must not be claimed from the offline
+  artifact.
+
+### Next week plan
+- Run the live local-model matrix with at least three repeats.
+- Add threshold tuning on a development split and adaptive paraphrase attacks.
+

@@ -1,0 +1,33 @@
+{
+  "datasets": [
+    {
+      "name": "ogx-evals",
+      "license": "MIT",
+      "url": "https://doi.org/10.5281/zenodo.19743797",
+      "version": "2026-01",
+      "notes": "Multi-tenant authorization probes. Download into benchmarks/.cache; do not commit corpora."
+    },
+    {
+      "name": "agentdojo",
+      "license": "MIT",
+      "url": "https://github.com/ethz-spylab/agentdojo",
+      "version": "neurips-2024",
+      "notes": "Use environment-state ASR protocol for tool actions."
+    },
+    {
+      "name": "injecagent",
+      "license": "MIT",
+      "url": "https://github.com/uiuc-kang-lab/InjecAgent",
+      "version": "acl-2024",
+      "notes": "Direct-harm and data-stealing families."
+    },
+    {
+      "name": "bipia",
+      "license": "MIT-code; datasets retain upstream licenses",
+      "url": "https://github.com/microsoft/BIPIA",
+      "version": "kdd-2025",
+      "notes": "Include only subsets whose dataset licenses are recorded in adapters."
+    }
+  ],
+  "local_fixture": "benchmarks/fixtures/authinject_cases.json"
+}

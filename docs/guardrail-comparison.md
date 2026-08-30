@@ -1,98 +1,93 @@
-# Guardrail Comparison Test
+# Guardrail comparison: retrieved-context injection detection
 
-## Purpose
+## Exact task
 
-`experiments/run_guardrail_comparison.py` benchmarks security checks for two tasks:
+Binary classification of **retrieved tool-response documents**:
 
-1. Prompt-injection classification.
-2. PII and secret detection.
+> Does this untrusted document contain an **indirect prompt injection** aimed at the agent?
 
-It operates on text samples directly. It does not use ChromaDB because it measures guardrail classification, not document retrieval, embedding quality, or ranking.
+Positive class = InjecAgent **enhanced** attacker instruction (Zhan et al., Findings of ACL 2024, MIT) inserted into an InjecAgent user-tool response template.  
+Negative class = the same templates filled with the paper’s own user instruction / thought text, **no** attacker instruction.
 
-## Test data
+This is **retrieved-context validation**, not user-query jailbreak classification, not PII detection, and not tool-trace alignment.
 
-The script contains two small labeled datasets. Each has 20 samples:
+The original Week 8 `experiments/run_guardrail_comparison.py` used copied
+NeMo-style and Meta-style prompts while naming them as frameworks. That was not
+a technically valid framework comparison. The command is retained as a
+compatibility entry point, but it now invokes this maintained same-task
+benchmark. The historical 60%→0% generation-hijack result is a different
+experiment and remains reproducible through
+`experiments/run_indirect_injection_eval.py`.
 
-- Prompt injection: 10 benign queries and 10 malicious queries.
-- PII: 10 benign texts and 10 texts containing PII or secrets.
+## Implementations
 
-Each sample has a Boolean `label`. `True` means the sample should be detected or blocked; `False` means it should be allowed.
+| Name | Component | Role |
+|------|-----------|------|
+| `repository_heuristic` | `heuristic_is_indirect_injection` | Current repo control |
+| `protectai_llm_guard_prompt_injection` | Protect AI LLM Guard `PromptInjection` (same ProtectAI DeBERTa weights via `transformers` if `scan()` fails) | External baseline 1 |
+| `guardrails_ai_detect_prompt_injection` | Guardrails AI `DetectPromptInjection` (Rebuff + Pinecone) | Not executed: requires a hosted Pinecone index |
+| `huggingface_fmops_prompt_injection` | `fmops/distilbert-prompt-injection` via Hugging Face `pipeline` | Local substitute if Guardrails/Rebuff cannot run in the app venv |
 
-## Prompt-injection predictors
+Marked **not comparable** (not executed as equivalents):
 
-### Repository control
+- NeMo `self check input` — runtime not installed; a copied prompt is not the framework
+- NeMo retrieval PII rail — different function
+- LlamaFirewall PromptGuard 2 — gated model, not downloaded
+- LlamaFirewall AlignmentCheck — agent CoT, plus Together API
+- LLM Guard Anonymize/Secrets — PII/secrets, not injection
+- Guardrails PII validators — different function
 
-`repo_predict_injection()` calls the repository `_injection_guardrail()` in `src/data_functions/query_engine.py`. The guardrail sends the text to the configured OpenAI-compatible chat model and expects a `SAFE` or `MALICIOUS` classification.
+## Dataset
 
-### NeMo-style self-check
+InjecAgent (`benchmarks/.cache/InjecAgent`, MIT). Do not commit the clone. Held-out sample **ids** are stored in the results JSON; texts are rebuilt from the cache.
 
-`nemo_predict_injection()` uses a prompt modeled on a NeMo Guardrails self-check input rail. It asks the chat model whether the message should be blocked and interprets `yes` as malicious.
+## Reproduction
 
-This is a prompt-pattern implementation in the experiment; it does not instantiate the full NVIDIA NeMo Guardrails runtime.
-
-### Meta Llama Guard-style taxonomy
-
-`meta_predict_injection()` supplies safety categories for prompt injection, system override, jailbreak, and secret extraction. It asks for `safe` or `unsafe` and interprets `unsafe` as malicious.
-
-This is a taxonomy-style prompt pattern; it does not load a separate Meta Llama Guard or LlamaFirewall model.
-
-## PII predictors
-
-### Repository Presidio
-
-`repo_predict_pii()` calls `_pii_input_guardrail()`. Microsoft Presidio analyzes the text and anonymizes detected entities. If the anonymized result differs from the original, the sample is marked as containing PII.
-
-### Regex validator
-
-`guardrails_ai_predict_pii()` applies local regular expressions for email addresses, phone numbers, credit cards, SSNs, API keys, passwords, and driver-license identifiers.
-
-This is a lightweight validator pattern, not a full Guardrails AI service or external model.
-
-Meta Llama Guard is marked as not comparable for PII because content moderation classification does not provide entity extraction and masking.
-
-## Model and services
-
-The LLM-based predictors use the shared `ChatOpenAI` client configured for an OpenAI-compatible endpoint. Groq is the default endpoint, and the model is selected by `LLM_MODEL` or `GROQ_MODEL`, with `openai/gpt-oss-20b` as the current default. Temperature is `0.0`.
-
-The LLM is called once per sample for each LLM-based predictor. Presidio and regex validation run locally. ChromaDB, embeddings, SpiceDB, and document ingestion are outside this benchmark.
-
-## Metric calculation
-
-For each predictor, the script stores the true labels, predicted labels, and elapsed time. It then counts:
-
-- `TP`: malicious sample correctly detected.
-- `FP`: benign sample incorrectly blocked.
-- `TN`: benign sample correctly allowed.
-- `FN`: malicious sample missed.
-
-It calculates:
-
-$$
-\text{Precision} = \frac{TP}{TP + FP}
-$$
-
-$$
-\text{Recall} = \frac{TP}{TP + FN}
-$$
-
-$$
-F1 = \frac{2 \times \text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}
-$$
-
-It also reports false-positive rate, false-negative rate, median latency, 95th-percentile latency, and throughput.
-
-Latency is measured around each predictor call with `time.perf_counter()`. Network-backed LLM checks are therefore much slower than local regex checks.
-
-## Results interpretation
-
-The results are stored in `experiments/results/guardrail_comparison.json`. The benchmark showed that the NeMo-style prompt had the best prompt-injection F1 on this small dataset, while the repository and Meta-style prompts detected all attacks but also falsely blocked benign samples.
-
-For PII, Presidio had higher recall, while the regex validator had no false positives but missed more cases. These results describe the tested implementations and dataset; they are not a definitive comparison of the complete external frameworks.
-
-## Reproduce
+**1. Restore the application environment** (you installed comparison packages into `.venv` and downgraded LangChain):
 
 ```bash
-python experiments/run_guardrail_comparison.py
+cd ~/01-secure-agentic-rag
+source .venv/bin/activate
+pip install -e ".[dev]"
 ```
 
-The command requires the configured LLM endpoint for LLM-based checks and the repository's Presidio dependencies for the Presidio check.
+**2. Use a separate venv for this comparison** (recommended so the API keeps working):
+
+```bash
+python3 -m venv .venv-guardrails
+source .venv-guardrails/bin/activate
+pip install -U pip
+pip install -e .
+pip install "llm-guard==0.3.16" "guardrails-ai-detect-prompt-injection==0.1.0"
+python -m guardrails_ai.detect_prompt_injection.post_install
+mkdir -p benchmarks/.cache
+test -d benchmarks/.cache/InjecAgent || git clone --depth 1 https://github.com/uiuc-kang-lab/InjecAgent.git benchmarks/.cache/InjecAgent
+```
+
+`DetectPromptInjection` requires a **Pinecone index** (Rebuff). That would send InjecAgent retrieved-context text off-box, so it is marked not comparable. The harness runs `fmops/distilbert-prompt-injection` locally as the second equivalent injection classifier.
+
+If you already installed into `.venv` and just want the JSON now:
+
+```bash
+cd ~/01-secure-agentic-rag
+source .venv/bin/activate
+python -m secure_rag.benchmark.guardrail_compare --out experiments/results/guardrail_comparison.json
+# Equivalent compatibility command:
+python experiments/run_guardrail_comparison.py --out experiments/results/guardrail_comparison.json
+```
+
+First LLM Guard run downloads `protectai/deberta-v3-base-prompt-injection-v2` from Hugging Face to the local cache. Samples are classified on CPU/GPU locally.
+
+Optional repository LLM classifier (loopback DeepSeek only):
+
+```bash
+GUARDRAIL_COMPARE_REPO_LLM=1 python -m secure_rag.benchmark.guardrail_compare --out experiments/results/guardrail_comparison.json
+```
+
+## Output
+
+`experiments/results/guardrail_comparison.json`
+
+Contains TP/FP/TN/FN, precision, recall, F1, FPR, FNR, median/P95 latency, throughput, execution failures, versions, hardware, and not-comparable entries.
+
+Do not commit API keys. The results file stores sample **ids**, not full InjecAgent texts.

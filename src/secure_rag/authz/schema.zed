@@ -1,0 +1,26 @@
+definition user {}
+
+definition tenant {
+    relation member: user
+    permission view = member
+}
+
+definition document {
+    relation tenant: tenant
+    relation viewer: user
+    relation editor: user
+    relation owner: user
+
+    permission view = viewer + editor + owner + tenant->view
+    permission edit = editor + owner
+}
+
+definition chunk {
+    relation parent_document: document
+    permission view = parent_document->view
+}
+
+definition tool {
+    relation caller: user
+    permission execute = caller
+}
