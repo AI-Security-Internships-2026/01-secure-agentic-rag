@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Any, Literal, TypedDict
 
 from langgraph.graph import END, StateGraph
@@ -21,6 +22,29 @@ from secure_rag.retrieval.qdrant_store import RetrievedChunk, get_vector_store
 from secure_rag.settings import Settings, get_settings
 
 FilteringMode = Literal["none", "pre", "post", "research_baseline_none"]
+
+
+@dataclass
+class ChunkRef:
+    tenant_id: str
+    doc_id: str
+    chunk_id: str
+    text: str
+    retrieved_at_policy_version: int = 1
+
+
+_policy_version: int = 1
+
+
+def get_policy_version() -> int:
+    global _policy_version
+    return _policy_version
+
+
+def bump_policy_version() -> int:
+    global _policy_version
+    _policy_version += 1
+    return _policy_version
 
 
 class AgentState(TypedDict, total=False):
@@ -48,6 +72,7 @@ class AgentState(TypedDict, total=False):
     generator: str
     llm_calls: int
     budget_max: int
+    policy_version: int
 
 
 NAIVE_GENERATOR_PROMPT = (
@@ -147,9 +172,13 @@ def guard_input(state: AgentState) -> dict:
 
 
 def retrieve_node(state: AgentState) -> dict:
+    settings = get_settings()
+    user_id = state["user_id"]
+    current_policy_ver = state.get("policy_version", get_policy_version())
+
     chunks, diagnostics = retrieve_authorized(
         state["anonymized_query"],
-        state["user_id"],
+        user_id,
         n_results=state.get("n_results", 5),
         filtering_mode=state.get("filtering_mode", "pre"),
         collection_name=state.get("collection_name") or None,
@@ -157,17 +186,91 @@ def retrieve_node(state: AgentState) -> dict:
     )
     merged = dict(state.get("diagnostics", {}))
     merged.update(diagnostics)
+    merged["policy_version"] = current_policy_ver
+
     contexts = [c.text for c in chunks]
     retrieved = [
-        {"chunk_id": c.chunk_id, "document_id": c.document_id, "tenant_id": c.tenant_id, "score": c.score, "taint": c.taint}
+        {
+            "chunk_id": c.chunk_id,
+            "document_id": c.document_id,
+            "tenant_id": c.tenant_id,
+            "score": c.score,
+            "taint": c.taint,
+            "retrieved_at_policy_version": current_policy_ver,
+        }
         for c in chunks
     ]
+
     prior_contexts = list(state.get("prior_contexts") or [])
     prior_retrieved = list(state.get("prior_retrieved") or [])
-    if prior_contexts:
-        contexts = prior_contexts + contexts
-        retrieved = prior_retrieved + retrieved
-        merged["cross_turn_prior_chunks"] = len(prior_contexts)
+
+    revalidated_contexts: list[str] = []
+    revalidated_retrieved: list[dict[str, Any]] = []
+    stale_dropped = 0
+    revalidated_passed = 0
+
+    authz = get_authz_client(settings)
+    n_prior = max(len(prior_contexts), len(prior_retrieved))
+
+    for i in range(n_prior):
+        meta = prior_retrieved[i] if i < len(prior_retrieved) else {}
+        ctx_text = prior_contexts[i] if i < len(prior_contexts) else str(meta.get("text", ""))
+        doc_id = meta.get("document_id") or meta.get("doc_id", "")
+        chunk_id = meta.get("chunk_id", "")
+        t_id = meta.get("tenant_id") or state.get("tenant_id", "")
+
+        if not doc_id:
+            # Chunks lacking document provenance cannot be verified against ACLs -> drop safely
+            stale_dropped += 1
+            emit(
+                "context.revalidated.drop",
+                user_id=user_id,
+                document_id="unknown",
+                tenant_id=t_id,
+                extra={"reason": "missing_provenance"},
+            )
+            continue
+
+        # Check current SpiceDB authorization
+        is_allowed = authz.check_permission("document", doc_id, "view", "user", user_id)
+        if is_allowed:
+            revalidated_contexts.append(ctx_text)
+            revalidated_retrieved.append(
+                {
+                    "chunk_id": chunk_id or f"{doc_id}__prior",
+                    "document_id": doc_id,
+                    "tenant_id": t_id,
+                    "score": meta.get("score", 0.0),
+                    "taint": meta.get("taint", "untrusted"),
+                    "retrieved_at_policy_version": meta.get("retrieved_at_policy_version", current_policy_ver),
+                }
+            )
+            revalidated_passed += 1
+            emit(
+                "context.revalidated.pass",
+                user_id=user_id,
+                document_id=doc_id,
+                tenant_id=t_id,
+                extra={"chunk_id": chunk_id},
+            )
+        else:
+            stale_dropped += 1
+            emit(
+                "context.revalidated.drop",
+                user_id=user_id,
+                document_id=doc_id,
+                tenant_id=t_id,
+                extra={"chunk_id": chunk_id, "reason": "permission_revoked"},
+            )
+
+    merged["cross_turn_prior_chunks"] = len(revalidated_contexts)
+    merged["stale_chunks_dropped_this_turn"] = stale_dropped
+    merged["prior_chunks_revalidated_pass"] = revalidated_passed
+
+    if revalidated_contexts:
+        contexts = revalidated_contexts + contexts
+        retrieved = revalidated_retrieved + retrieved
+
     return {
         "contexts": contexts,
         "retrieved": retrieved,
@@ -333,11 +436,13 @@ def query_rag_system(
     generator: str = "auto",
     prior_contexts: list[str] | None = None,
     prior_retrieved: list[dict[str, Any]] | None = None,
+    policy_version: int | None = None,
 ) -> dict:
     settings = get_settings()
     if generator == "auto":
         generator = "extractive" if settings.app_env == "test" else "llm"
     max_steps = settings.max_agent_steps if enable_agent_loop else 1
+    current_pol_ver = get_policy_version() if policy_version is None else policy_version
     initial: AgentState = {
         "collection_name": collection_name,
         "query": query,
@@ -363,6 +468,7 @@ def query_rag_system(
         "generator": generator,
         "llm_calls": 0,
         "budget_max": settings.max_llm_calls,
+        "policy_version": current_pol_ver,
     }
     try:
         final_state = compiled_graph().invoke(initial)

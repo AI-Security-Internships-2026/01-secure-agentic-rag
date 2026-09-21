@@ -309,3 +309,14 @@ def test_ingest_cross_tenant_forbidden_403(client):
     )
     assert res.status_code == 403
     assert "not a member of tenant 'engineering'" in res.json()["detail"]
+
+
+def test_policy_changed_endpoint(client):
+    """Webhook /authz/policy_changed increments policy version."""
+    from secure_rag.agent.graph import get_policy_version
+
+    v0 = get_policy_version()
+    res = client.post("/authz/policy_changed")
+    assert res.status_code == 200
+    assert res.json()["status"] == "ok"
+    assert res.json()["policy_version"] == v0 + 1

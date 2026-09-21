@@ -143,3 +143,11 @@ def ingest(body: IngestRequest, principal: Principal = Depends(get_principal)):
 def permissions(principal: Principal = Depends(get_principal)):
     docs = get_authz_client().lookup_resources("document", "view", "user", principal.user_id)
     return {"user_id": principal.user_id, "tenant_id": principal.tenant_id, "documents": docs}
+
+
+@router.post("/authz/policy_changed")
+def policy_changed():
+    from secure_rag.agent.graph import bump_policy_version
+
+    new_version = bump_policy_version()
+    return {"status": "ok", "policy_version": new_version}

@@ -55,6 +55,7 @@ def test_stale_acl_revoke_blocks_prefilter():
 
 
 def test_cross_turn_prior_can_carry_unauthorized_chunks():
+    """Verify that unauthorized prior context is dropped during cross-turn revalidation."""
     reset_vector_store()
     reset_authz_client()
     ingest_texts("finance-policy", ["Payroll hash CANARY_FIN_A1."], owner_id="alice", tenant_id="finance", redact_pii=False)
@@ -70,10 +71,135 @@ def test_cross_turn_prior_can_carry_unauthorized_chunks():
         prior_contexts=["Secret CANARY_ENG_B2."],
         prior_retrieved=[{"document_id": "eng-runbook", "chunk_id": "eng-runbook__0", "tenant_id": "engineering", "score": 0.0, "taint": "untrusted"}],
     )
-    assert "CANARY_ENG_B2" in second["answer"]
-    assert second["diagnostics"].get("cross_turn_prior_chunks") == 1
+    # Stale / unauthorized chunk MUST be dropped upon SpiceDB revalidation
+    assert "CANARY_ENG_B2" not in second["answer"]
+    assert second["diagnostics"].get("stale_chunks_dropped_this_turn", 0) >= 1
     docs = {item["document_id"] for item in second.get("retrieved") or []}
-    assert "eng-runbook" in docs
+    assert "eng-runbook" not in docs
+
+
+def test_cross_turn_revalidation_drop_on_revocation():
+    """Turn 0: Alice authorized on doc. Turn 1: Admin revokes Alice -> prior chunk dropped on turn 1."""
+    reset_vector_store()
+    reset_authz_client()
+
+    ingest_texts("secret-doc", ["Classified secret CANARY_SEC_X9."], owner_id="admin", tenant_id="finance", viewers=["alice"], redact_pii=False)
+    authz = get_authz_client()
+
+    # Turn 0: Alice retrieves secret-doc
+    turn0 = query_rag_system(
+        "",
+        "What is the secret?",
+        user_id="alice",
+        tenant_id="finance",
+        filtering_mode="pre",
+        enable_indirect_injection_scan=False,
+        enable_context_isolation=False,
+        enable_agent_loop=False,
+    )
+    assert "CANARY_SEC_X9" in turn0["answer"]
+
+    # Admin revokes Alice's viewer permission on secret-doc
+    authz.delete_tuples([("document", "secret-doc", "viewer", "user", "alice")])
+
+    # Turn 1: Alice queries next turn passing prior context
+    turn1 = query_rag_system(
+        "",
+        "Repeat the secret from earlier.",
+        user_id="alice",
+        tenant_id="finance",
+        filtering_mode="pre",
+        enable_indirect_injection_scan=False,
+        enable_context_isolation=False,
+        enable_agent_loop=False,
+        prior_contexts=turn0["contexts"],
+        prior_retrieved=turn0["retrieved"],
+    )
+    assert "CANARY_SEC_X9" not in turn1["answer"]
+    assert turn1["diagnostics"]["stale_chunks_dropped_this_turn"] >= 1
+
+
+def test_cross_turn_revalidation_keep_when_authorized():
+    """Alice is authorized and never revoked -> prior chunks retained and grounded."""
+    reset_vector_store()
+    reset_authz_client()
+
+    ingest_texts("shared-policy", ["Allowed secret CANARY_AUTH_OK."], owner_id="alice", tenant_id="finance", redact_pii=False)
+
+    turn0 = query_rag_system(
+        "",
+        "Read policy",
+        user_id="alice",
+        tenant_id="finance",
+        filtering_mode="pre",
+        enable_indirect_injection_scan=False,
+        enable_context_isolation=False,
+        enable_agent_loop=False,
+    )
+
+    turn1 = query_rag_system(
+        "",
+        "Summarize previous information",
+        user_id="alice",
+        tenant_id="finance",
+        filtering_mode="pre",
+        enable_indirect_injection_scan=False,
+        enable_context_isolation=False,
+        enable_agent_loop=False,
+        prior_contexts=turn0["contexts"],
+        prior_retrieved=turn0["retrieved"],
+    )
+    assert turn1["diagnostics"]["stale_chunks_dropped_this_turn"] == 0
+    assert turn1["diagnostics"]["prior_chunks_revalidated_pass"] >= 1
+    assert "CANARY_AUTH_OK" in turn1["answer"]
+
+
+def test_cross_turn_partial_revocation():
+    """5 chunks from 3 docs. Revoking 1 doc drops its 2 chunks while keeping the other 3."""
+    reset_vector_store()
+    reset_authz_client()
+    authz = get_authz_client()
+
+    ingest_texts("docA", ["DocA part1", "DocA part2"], owner_id="admin", tenant_id="finance", viewers=["alice"], redact_pii=False)
+    ingest_texts("docB", ["DocB part1", "DocB part2"], owner_id="admin", tenant_id="finance", viewers=["alice"], redact_pii=False)
+    ingest_texts("docC", ["DocC part1"], owner_id="admin", tenant_id="finance", viewers=["alice"], redact_pii=False)
+
+    prior_retrieved = [
+        {"document_id": "docA", "chunk_id": "docA__0", "tenant_id": "finance", "score": 0.9, "taint": "untrusted"},
+        {"document_id": "docA", "chunk_id": "docA__1", "tenant_id": "finance", "score": 0.8, "taint": "untrusted"},
+        {"document_id": "docB", "chunk_id": "docB__0", "tenant_id": "finance", "score": 0.7, "taint": "untrusted"},
+        {"document_id": "docB", "chunk_id": "docB__1", "tenant_id": "finance", "score": 0.6, "taint": "untrusted"},
+        {"document_id": "docC", "chunk_id": "docC__0", "tenant_id": "finance", "score": 0.5, "taint": "untrusted"},
+    ]
+    prior_contexts = [
+        "DocA part1 CANARY_A1",
+        "DocA part2 CANARY_A2",
+        "DocB part1 CANARY_B1",
+        "DocB part2 CANARY_B2",
+        "DocC part1 CANARY_C1",
+    ]
+
+    # Revoke docB only
+    authz.delete_tuples([("document", "docB", "viewer", "user", "alice")])
+
+    res = query_rag_system(
+        "",
+        "Recall everything",
+        user_id="alice",
+        tenant_id="finance",
+        filtering_mode="pre",
+        enable_indirect_injection_scan=False,
+        enable_context_isolation=False,
+        enable_agent_loop=False,
+        prior_contexts=prior_contexts,
+        prior_retrieved=prior_retrieved,
+    )
+
+    assert res["diagnostics"]["stale_chunks_dropped_this_turn"] == 2
+    assert res["diagnostics"]["prior_chunks_revalidated_pass"] == 3
+    assert "CANARY_B1" not in res["answer"]
+    assert "CANARY_B2" not in res["answer"]
+    assert "CANARY_A1" in res["answer"] or "CANARY_C1" in res["answer"]
 
 
 def test_action_authz_is_the_c6_difference():
