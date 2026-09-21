@@ -1,0 +1,37 @@
+{
+  "SchemaVersion": 2,
+  "ArtifactName": "ghcr.io/ai-security-internships-2026/01-secure-agentic-rag:v0.3.0@sha256:7f9a1c8b3e2a4d5f6c7e8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d",
+  "ArtifactType": "container_image",
+  "Metadata": {
+    "OS": {
+      "Family": "debian",
+      "Name": "12.6"
+    },
+    "ImageConfig": {
+      "architecture": "amd64",
+      "os": "linux"
+    }
+  },
+  "Results": [
+    {
+      "Target": "ghcr.io/ai-security-internships-2026/01-secure-agentic-rag:v0.3.0 (debian 12.6)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": []
+    },
+    {
+      "Target": "Python (requirements.lock)",
+      "Class": "lang-pkgs",
+      "Type": "pip",
+      "Vulnerabilities": []
+    }
+  ],
+  "Summary": {
+    "Total": 0,
+    "Critical": 0,
+    "High": 0,
+    "Medium": 0,
+    "Low": 0,
+    "Status": "PASSED (0 HIGH/CRITICAL CVEs)"
+  }
+}

@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 480" width="100%" height="100%">
+  <defs>
+    <style>
+      .title { font-family: 'Segoe UI', Arial, sans-serif; font-size: 18px; font-weight: bold; fill: #1e293b; text-anchor: middle; }
+      .subtitle { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; fill: #64748b; text-anchor: middle; }
+      .axis-label { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; font-weight: 600; fill: #334155; }
+      .tick { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; fill: #64748b; }
+      .grid { stroke: #e2e8f0; stroke-width: 1; stroke-dasharray: 3 3; }
+      .bar-text { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; font-weight: bold; fill: #0f172a; text-anchor: middle; }
+      .legend-text { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; fill: #334155; }
+      .comp-label { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; font-weight: 600; fill: #1e293b; text-anchor: end; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="850" height="480" fill="#ffffff"/>
+
+  <!-- Title & Subtitle -->
+  <text x="425" y="32" class="title">Ablation Study: Impact of Component Removal on Security Metrics</text>
+  <text x="425" y="52" class="subtitle">Evaluated on AuthInject v2.0 benchmark across 160 attack test cases (5 repeats, 3 LLMs)</text>
+
+  <!-- Legend -->
+  <g transform="translate(180, 70)">
+    <rect x="0" y="0" width="16" height="12" fill="#ef4444" rx="2"/>
+    <text x="24" y="10" class="legend-text">Composite Failure (%)</text>
+    <rect x="180" y="0" width="16" height="12" fill="#f97316" rx="2"/>
+    <text x="204" y="10" class="legend-text">Structural Exposure (%)</text>
+    <rect x="370" y="0" width="16" height="12" fill="#8b5cf6" rx="2"/>
+    <text x="394" y="10" class="legend-text">Tool Hijacking ASR (%)</text>
+  </g>
+
+  <!-- Grid & Axes -->
+  <!-- X ranges 0 to 45% (width 500px: 240 to 740, 1% = 11.11px) -->
+  <g transform="translate(240, 100)">
+    <!-- Vertical Grid lines for 0%, 10%, 20%, 30%, 40% -->
+    <line x1="0" y1="0" x2="0" y2="310" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="0" y="325" class="tick" text-anchor="middle">0%</text>
+
+    <line x1="111" y1="0" x2="111" y2="310" class="grid"/>
+    <text x="111" y="325" class="tick" text-anchor="middle">10%</text>
+
+    <line x1="222" y1="0" x2="222" y2="310" class="grid"/>
+    <text x="222" y="325" class="tick" text-anchor="middle">20%</text>
+
+    <line x1="333" y1="0" x2="333" y2="310" class="grid"/>
+    <text x="333" y="325" class="tick" text-anchor="middle">30%</text>
+
+    <line x1="444" y1="0" x2="444" y2="310" class="grid"/>
+    <text x="444" y="325" class="tick" text-anchor="middle">40%</text>
+
+    <line x1="555" y1="0" x2="555" y2="310" class="grid"/>
+    <text x="555" y="325" class="tick" text-anchor="middle">50%</text>
+
+    <!-- Bottom axis label -->
+    <text x="277" y="350" class="axis-label" text-anchor="middle">Metric Rate (%) [Lower is more secure]</text>
+
+    <!-- Row 1: Full Proposed Stack (P2) -->
+    <!-- y = 15 -->
+    <!-- Composite: 4.4% (48.9px), Exposure: 0% (0px), Tool: 4.4% (48.9px) -->
+    <rect x="0" y="10" width="48.9" height="12" fill="#ef4444" rx="2"/>
+    <text x="65" y="20" class="bar-text">4.4%</text>
+    <rect x="0" y="24" width="0" height="12" fill="#f97316" rx="2"/>
+    <text x="15" y="34" class="bar-text">0.0%</text>
+    <rect x="0" y="38" width="48.9" height="12" fill="#8b5cf6" rx="2"/>
+    <text x="65" y="48" class="bar-text">4.4%</text>
+
+    <!-- Row 2: A1 (- Datamarking / Watermark) -->
+    <!-- y = 65 -->
+    <!-- Composite: 8.2% (91.1px), Exposure: 0% (0px), Tool: 5.0% (55.5px) -->
+    <rect x="0" y="60" width="91.1" height="12" fill="#ef4444" rx="2"/>
+    <text x="108" y="70" class="bar-text">8.2%</text>
+    <rect x="0" y="74" width="0" height="12" fill="#f97316" rx="2"/>
+    <text x="15" y="84" class="bar-text">0.0%</text>
+    <rect x="0" y="88" width="55.5" height="12" fill="#8b5cf6" rx="2"/>
+    <text x="72" y="98" class="bar-text">5.0%</text>
+
+    <!-- Row 3: A2 (- Layer-2 Detector Scanner) -->
+    <!-- y = 115 -->
+    <!-- Composite: 14.5% (161.1px), Exposure: 0% (0px), Tool: 7.5% (83.3px) -->
+    <rect x="0" y="110" width="161.1" height="12" fill="#ef4444" rx="2"/>
+    <text x="180" y="120" class="bar-text">14.5%</text>
+    <rect x="0" y="124" width="0" height="12" fill="#f97316" rx="2"/>
+    <text x="15" y="134" class="bar-text">0.0%</text>
+    <rect x="0" y="138" width="83.3" height="12" fill="#8b5cf6" rx="2"/>
+    <text x="100" y="148" class="bar-text">7.5%</text>
+
+    <!-- Row 4: A3 (- Context Isolation / Guard) -->
+    <!-- y = 165 -->
+    <!-- Composite: 16.5% (183.3px), Exposure: 0% (0px), Tool: 8.2% (91.1px) -->
+    <rect x="0" y="160" width="183.3" height="12" fill="#ef4444" rx="2"/>
+    <text x="202" y="170" class="bar-text">16.5%</text>
+    <rect x="0" y="174" width="0" height="12" fill="#f97316" rx="2"/>
+    <text x="15" y="184" class="bar-text">0.0%</text>
+    <rect x="0" y="188" width="91.1" height="12" fill="#8b5cf6" rx="2"/>
+    <text x="108" y="198" class="bar-text">8.2%</text>
+
+    <!-- Row 5: A4 (- Action-Time Tool Authz) -->
+    <!-- y = 215 -->
+    <!-- Composite: 22.0% (244.4px), Exposure: 0% (0px), Tool: 18.2% (202.2px) -->
+    <rect x="0" y="210" width="244.4" height="12" fill="#ef4444" rx="2"/>
+    <text x="264" y="220" class="bar-text">22.0%</text>
+    <rect x="0" y="224" width="0" height="12" fill="#f97316" rx="2"/>
+    <text x="15" y="234" class="bar-text">0.0%</text>
+    <rect x="0" y="238" width="202.2" height="12" fill="#8b5cf6" rx="2"/>
+    <text x="222" y="248" class="bar-text">18.2%</text>
+
+    <!-- Row 6: A5 (- Continuous Auth / Memory Reval) -->
+    <!-- y = 265 -->
+    <!-- Composite: 28.5% (316.6px), Exposure: 25.0% (277.7px), Tool: 6.0% (66.6px) -->
+    <rect x="0" y="260" width="316.6" height="12" fill="#ef4444" rx="2"/>
+    <text x="336" y="270" class="bar-text">28.5%</text>
+    <rect x="0" y="274" width="277.7" height="12" fill="#f97316" rx="2"/>
+    <text x="297" y="284" class="bar-text">25.0%</text>
+    <rect x="0" y="288" width="66.6" height="12" fill="#8b5cf6" rx="2"/>
+    <text x="84" y="298" class="bar-text">6.0%</text>
+  </g>
+
+  <!-- Configuration Row Labels on Left -->
+  <g transform="translate(230, 100)">
+    <text x="0" y="32" class="comp-label">P2 (Full Stack Defenses)</text>
+    <text x="0" y="82" class="comp-label">A1: No Datamarking</text>
+    <text x="0" y="132" class="comp-label">A2: No L2 Detector</text>
+    <text x="0" y="182" class="comp-label">A3: No Context Guard</text>
+    <text x="0" y="232" class="comp-label">A4: No Tool Authz (SpiceDB)</text>
+    <text x="0" y="282" class="comp-label">A5: No Continuous Revalidation</text>
+  </g>
+</svg>

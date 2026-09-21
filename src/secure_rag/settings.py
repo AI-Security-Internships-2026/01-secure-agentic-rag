@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_env: Literal["test", "development", "production"] = "development"
+    production_enforce_pre_auth: bool = True
     log_level: str = "INFO"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
@@ -45,6 +46,7 @@ class Settings(BaseSettings):
     enable_llm_injection_scan: bool = True
     enable_action_authz: bool = True
     enable_task_alignment: bool = False
+    allow_any_member_create_docs: bool = True
     max_agent_steps: int = 2
     max_llm_calls: int = 12
 
@@ -56,6 +58,7 @@ class Settings(BaseSettings):
     # sub-0.1 noise that broad recognizers emit on digit strings.
     pii_score_threshold: float = 0.35
 
+    audit_output_destination: Literal["file", "stdout"] = "stdout"
     audit_log_path: str = "logs/audit.jsonl"
 
     @property

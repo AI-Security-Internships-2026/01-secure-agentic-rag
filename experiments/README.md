@@ -1,50 +1,39 @@
-# Experiments
+# Experiments & Evaluation Artifacts
 
-Two evaluation tracks are retained:
+## Source of Truth & Reproducibility Hierarchy
 
-1. the Week 8 direct-context experiment isolates whether a model follows an
-   injection in a document that is already retrieved; and
-2. the Week 9–10 AuthInject matrix jointly evaluates authorization boundaries,
-   indirect injection, and tool actions.
+To ensure scientific integrity and eliminate artifact drift, the benchmark results follow a strict source-of-truth hierarchy:
 
-Historical retrieved-document ASR (requires the configured LLM):
+1. **Primary Raw Results**: `experiments/results/authinject_v2_live_{YYYY-MM-DD}.jsonl` (or `authinject_eval.jsonl`) — line-by-line record of each evaluation run with all 8 metrics, latency, and request identifiers.
+2. **Derived Summaries & Statistical Tests**: `experiments/results/authinject_eval.json` and `experiments/results/authinject_v2_analysis.json` — summarized rates, Wilson 95% confidence intervals, and paired McNemar test p-values.
+3. **Paper Tables & Figures**: Rebuilt deterministically from the above artifacts via `python generate_results.py`. No data files or figures are manually edited.
+4. **Integrity Manifest**: `experiments/results/AUTHENTICATE.txt` records SHA-256 checksums of all committed benchmark artifacts.
 
+## Running Benchmark Evaluations
+
+### 1. Deterministic Fixture Generation (v2.0, 160 cases)
 ```bash
-python experiments/run_indirect_injection_eval.py
+python -m secure_rag.benchmark.datasets --seed 42 --version 2.0 --size 160
 ```
 
-Output: `results/indirect_injection_eval.json`. The committed file is the
-historical 19 August run (60% to 0% canary ASR); rerunning may change
-model-dependent answers.
-
-AuthInject C0–C8:
-
+### 2. Full Benchmark Matrix (11 Configs × 3 Models × 5 Repeats)
 ```bash
-python -m secure_rag.benchmark.adapters
-python -m secure_rag.benchmark.runner --repeats 1 --split test --out experiments/results/authinject_eval.json
-python -m secure_rag.benchmark.analyze experiments/results/authinject_eval.jsonl --out experiments/results/authinject_tables.json
+python -m secure_rag.benchmark.runner --repeats 5 --split all --generator extractive --out experiments/results/authinject_eval.json --jsonl_out experiments/results/authinject_v2_live_2026-09-21.jsonl
 ```
 
-Live model (uses `.env` `LLM_BASE_URL` / `LLM_MODEL`; do not set `APP_ENV=test`):
-
+### 3. Generate Paper Tables, Figures, and Gate Verification
 ```bash
-python -m secure_rag.benchmark.runner --live --repeats 3 --split test --out experiments/results/authinject_eval_live.json
+python generate_results.py --jsonl experiments/results/authinject_v2_live_2026-09-21.jsonl --out_analysis experiments/results/authinject_v2_analysis.json --gate_report experiments/results/gate-report.txt --figures_dir paper/figures
 ```
 
-| File | Meaning |
-|------|---------|
-| `results/authinject_eval.json` | Summary rates per config |
-| `results/authinject_eval.jsonl` | One scored row per case |
-| `results/authinject_tables.json` | Tables rebuilt from the JSONL |
+Output figures are written to `paper/figures/`:
+- `fig2_security_metrics_comparison.svg`
+- `fig3_precision_recall_f1.svg`
+- `fig4_latency_sequence_breakdown.svg`
+- `fig5_pareto_security_vs_latency.svg`
+- `fig6_violin_p95_concurrency.svg`
+- `fig7_cross_model_consistency.svg`
 
-`C0` is the non-agentic baseline. `C7`/`C8` turn the rewrite/rerank loop on. `--live` scores generated model text; the default is extractive (CI).
-
-Retrieved-context injection scanner comparison (InjecAgent, ACL 2024):
-
-```bash
-python -m secure_rag.benchmark.guardrail_compare --out experiments/results/guardrail_comparison.json
-# Historical command retained as a compatibility entry point:
-python experiments/run_guardrail_comparison.py --out experiments/results/guardrail_comparison.json
-```
-
-See `docs/guardrail-comparison.md`.
+## Historical Evaluations
+- `results/indirect_injection_eval.json`: Historical 19 August direct-context run (60% to 0% canary ASR).
+- `results/guardrail_comparison.json`: InjecAgent scanner comparison (see `docs/guardrail-comparison.md`).

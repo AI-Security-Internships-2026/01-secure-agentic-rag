@@ -1,4 +1,4 @@
-# Final Technical Report: AuthInject-RAG
+# Final Technical Report: Continuous Authorization over the Agentic-RAG Context Lifecycle (AuthInject-RAG)
 
 **Student:** Taha Bin Hanif  
 **Institution:** CNIT/PNTLab Pisa, TECIP, Scuola Superiore Sant'Anna  
@@ -6,7 +6,7 @@
 
 ## Abstract
 
-This report presents AuthInject-RAG, an authorization-first agentic retrieval system evaluated under combined cross-tenant leakage and indirect prompt injection. Ungated similarity search exposed unauthorized chunks in 100% of held-out combined probes (n=20, Wilson 95% CI 0.84–1.00). Authorization-first Qdrant payload filters with SpiceDB reduced unauthorized context exposure to 0% (CI 0.00–0.16). Injection scanning alone stopped canary hijacks but did not prevent structural exposure. The combined configuration with action-time authorization reached 0% exposure, 0% canary ASR, and 0% unauthorized tool ASR, with utility falling from 1.00 to 0.55 when poisoned authorized documents were discarded. These offline results use hash embeddings and a deterministic generator; live DeepSeek repeats remain the release measurement.
+This report presents a continuous lifecycle authorization architecture for enterprise agentic RAG systems evaluated under combined cross-tenant leakage, multi-turn stale ACL revocation, and indirect prompt injection. While Authorization-First Retrieval (AFR) eliminates point-in-time cross-tenant exposure during initial vector search, we show it suffers 100% stale unauthorized context exposure when access policies are revoked across multi-turn sessions. In contrast, our continuous authorization architecture enforces ReBAC across pre-retrieval, memory reuse revalidation, and action-time tool dispatch boundaries, achieving 0.0% unauthorized and structural context exposure, 0.0% stale ACL bypasses, and 4.4% model-chosen tool ASR across 160 test instances and 3 frontier LLMs with an acceptable +42% p50 latency overhead.
 
 ## 1. Introduction
 
