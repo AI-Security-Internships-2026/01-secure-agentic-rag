@@ -381,5 +381,28 @@ def test_authenticated_manifest_and_lockfile_present():
     assert "authinject_tables.json" in manifest_text
 
 
+def test_related_work_and_bibtex_expansion():
+    from secure_rag.benchmark.datasets import ROOT
+    bib_file = ROOT / "paper" / "references.bib"
+    tex_file = ROOT / "paper" / "related_work.tex"
+    lit_file = ROOT / "docs" / "literature-review.md"
+
+    assert bib_file.exists()
+    assert tex_file.exists()
+    assert lit_file.exists()
+
+    bib_text = bib_file.read_text(encoding="utf-8")
+    entries = [line for line in bib_text.splitlines() if line.startswith("@")]
+    assert len(entries) >= 50
+
+    tex_text = tex_file.read_text(encoding="utf-8")
+    assert r"\subsection{Authorization and Access Control in Multi-Tenant RAG}" in tex_text
+    assert r"\subsection{Indirect Prompt Injection Benchmarks and Defenses}" in tex_text
+    assert r"\subsection{Agent Tool-Action Authorization and Defenses}" in tex_text
+    assert r"\subsection{Context Persistence Across Turns and Memory Revocation}" in tex_text
+    assert r"\begin{table*}" in tex_text
+
+
+
 
 
