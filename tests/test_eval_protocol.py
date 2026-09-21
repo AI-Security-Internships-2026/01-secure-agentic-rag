@@ -365,4 +365,21 @@ def test_evaluation_gates_verification():
     assert passed is True
 
 
+def test_authenticated_manifest_and_lockfile_present():
+    from secure_rag.benchmark.datasets import ROOT
+    manifest = ROOT / "experiments" / "results" / "AUTHENTICATE.txt"
+    lockfile = ROOT / "requirements.lock"
+    tables = ROOT / "experiments" / "results" / "authinject_tables.json"
+
+    assert manifest.exists()
+    assert lockfile.exists()
+    assert tables.exists()
+
+    manifest_text = manifest.read_text(encoding="utf-8")
+    assert "SHA256" in manifest_text
+    assert "authinject_cases.json" in manifest_text
+    assert "authinject_tables.json" in manifest_text
+
+
+
 

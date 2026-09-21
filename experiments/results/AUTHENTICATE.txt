@@ -1,0 +1,31 @@
+# AuthInject-RAG Authenticated Artifact Manifest (v0.3.0)
+# Generated: 2026-09-21
+# SHA-256 Checksums for reproducibility and evaluation integrity
+
+# 1. Benchmark Fixture v2.0 (160 cases, same-tenant bait, 7 attack families)
+benchmarks/fixtures/authinject_cases.json
+SHA256: 4f1a28cb7e541b6329ef3e414c1f93efb492160d5c8eb18b335da43818e62f1a
+
+# 2. Benchmark Primary Live Evaluation Scored Rows
+experiments/results/authinject_v2_live_2026-09-21.jsonl
+SHA256: 9b2d8f99e3a67c51480f7634f19b26b3e8392110c71a39f60447fa44b82d49e1
+
+# 3. Statistical Analysis & Confidence Intervals
+experiments/results/authinject_v2_analysis.json
+SHA256: d189ef947c615b3e944719bbac225893ae14972109438067425026eb6fb912aa
+
+# 4. Tables Rebuilt from Matrix
+experiments/results/authinject_tables.json
+SHA256: 8c347b9d10e549acb452077e682ef9411985112f458198f378aa5198df89ca03
+
+# 5. Gate Report Verification Status
+experiments/results/gate-report.txt
+SHA256: 341a94371fa91ee235ef980f7457a166be9419ca62b9f9316d252414777d13b4
+
+# 6. Docker Build Image SHA256 Reference
+ghcr.io/ai-security-internships-2026/01-secure-agentic-rag:v0.3.0
+IMAGE_DIGEST: sha256:7c9e115049cf12948bb95b2149e85591398c2579df6408285514f7b233a1e948
+
+# 7. Release Commit Tag Reference
+GIT_COMMIT: 02b88ec16fa8603e46c7501b1a7d65609804bca8
+TAG: v0.3.0
