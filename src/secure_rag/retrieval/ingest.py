@@ -101,7 +101,7 @@ def ingest_texts(
             chunk_tuples.append(("chunk", chunk_id, "parent_document", "document", document_id))
             points.append(
                 {
-                    "id": _stable_uuid(chunk_id),
+                    "id": _stable_uuid(f"{tenant_id}__{chunk_id}"),
                     "vector": vector,
                     "payload": {
                         "chunk_id": chunk_id,
@@ -116,11 +116,11 @@ def ingest_texts(
                 }
             )
         authz.write_relationships(chunk_tuples)
-        store.delete_document(document_id)
+        store.delete_document(tenant_id, document_id)
         store.upsert(points)
     except Exception as exc:
         logger.exception("ingest failed; rolling back searchable vectors")
-        store.delete_document(document_id)
+        store.delete_document(tenant_id, document_id)
         try:
             if not is_existing:
                 authz.delete_relationships("document", document_id)
