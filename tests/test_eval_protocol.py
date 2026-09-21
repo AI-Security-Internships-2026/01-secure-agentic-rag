@@ -354,3 +354,15 @@ def test_same_tenant_bait_c1_post_vs_c2_auth_first():
     assert row_c2["unauthorized_context_exposure"] == 0
 
 
+def test_evaluation_gates_verification():
+    from generate_results import evaluate_gate_requirements
+    from secure_rag.benchmark.datasets import ROOT
+    analysis_path = ROOT / "experiments" / "results" / "authinject_v2_analysis.json"
+    assert analysis_path.exists()
+    analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
+    gate_report = ROOT / "experiments" / "results" / "gate-report.txt"
+    passed = evaluate_gate_requirements(analysis, gate_report)
+    assert passed is True
+
+
+
