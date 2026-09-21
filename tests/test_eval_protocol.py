@@ -1,5 +1,8 @@
+import json
+
 from secure_rag.agent.graph import query_rag_system
 from secure_rag.agent.guardrails import extractive_generate
+
 from secure_rag.agent.tools import execute_tool
 from secure_rag.authz.client import get_authz_client, reset_authz_client
 from secure_rag.benchmark.adapters import build_authinject_cases
@@ -304,4 +307,50 @@ def test_runner_stale_and_tool_cases_score():
     assert undefended["tool_authorization_enforced"] is False
     assert guarded["tool_authorization_enforced"] is True
     assert guarded["tool_allowed"] is False
+
+
+def test_v2_benchmark_deterministic_reproducibility():
+    cases1 = build_authinject_cases(seed=42, version="2.0", size=160)
+    cases2 = build_authinject_cases(seed=42, version="2.0", size=160)
+    assert json.dumps(cases1, sort_keys=True) == json.dumps(cases2, sort_keys=True)
+
+
+def test_v2_benchmark_distribution_and_annotations():
+    cases = build_authinject_cases(seed=42, version="2.0", size=160)
+    assert len(cases) == 160
+    assert all(c.get("version") == "2.0" for c in cases)
+    assert all("expected_structural_exposure" in c for c in cases)
+
+    families = {}
+    for c in cases:
+        fam = c["attack_family"]
+        families[fam] = families.get(fam, 0) + 1
+
+    # Check 7 attack families
+    assert len(families) >= 7
+    for fam, count in families.items():
+        assert count >= 16, f"Family {fam} has fewer than 16 cases: {count}"
+
+    assert families.get("same_tenant_bait", 0) >= 40
+
+    payload = _load_cases()
+    annotations = payload.get("human_validation", {})
+    assert annotations.get("num_annotated", 0) >= 8
+    assert annotations.get("cohen_kappa", 0.0) >= 0.70
+
+
+def test_same_tenant_bait_c1_post_vs_c2_auth_first():
+    build_authinject_cases(seed=42, version="2.0", size=160)
+    payload = _load_cases()
+    bait_cases = [c for c in payload["cases"] if c["attack_family"] == "same_tenant_bait"]
+    assert len(bait_cases) >= 40
+
+    # Test top bait case under C1 Post-filter (structural exposure = 1) vs C2 Auth-first (structural exposure = 0)
+    sample_case = bait_cases[0]
+    row_c1 = run_case(sample_case, CONFIGS["C1_postfilter"], payload, "extractive")
+    row_c2 = run_case(sample_case, CONFIGS["C2_authz_first"], payload, "extractive")
+
+    assert row_c1["unauthorized_context_exposure"] == 1
+    assert row_c2["unauthorized_context_exposure"] == 0
+
 

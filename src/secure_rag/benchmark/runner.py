@@ -109,7 +109,15 @@ def _load_cases() -> dict:
     path = fixture_path("authinject_cases.json")
     if not path.exists():
         build_authinject_cases()
+    else:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if payload.get("version") != "2.0":
+                build_authinject_cases()
+        except Exception:
+            build_authinject_cases()
     return json.loads(path.read_text(encoding="utf-8"))
+
 
 
 def _query_kwargs(case: dict, cfg: dict, generator: str) -> dict:
@@ -133,11 +141,11 @@ def _query_kwargs(case: dict, cfg: dict, generator: str) -> dict:
 def _ingest_corpus(payload: dict, poison_id: str, family: str) -> None:
     for doc in payload["documents"]:
         text = doc["text"]
-        if doc["document_id"] == poison_id and family not in {"stale_acl", "cross_turn"}:
+        if doc["document_id"] == poison_id and family not in {"stale_acl", "cross_turn", "same_tenant_bait"}:
             text = _poison(text, family)
-        viewers = [doc["owner"]]
-        if family == "stale_acl" and doc["document_id"] == "legal-hold":
-            viewers.append("bob")
+        viewers = list(doc.get("viewers") or [doc["owner"]])
+        if family == "stale_acl" and doc["document_id"] in {"legal-hold", "eng-malware-04"}:
+            viewers = list(set(viewers + ["bob", "alice"]))
         ingest_texts(
             doc["document_id"],
             [text],
@@ -151,6 +159,7 @@ def _ingest_corpus(payload: dict, poison_id: str, family: str) -> None:
             [
                 ("document", "legal-hold", "viewer", "user", "bob"),
                 ("tenant", "legal", "member", "user", "bob"),
+                ("document", "eng-malware-04", "viewer", "user", "alice"),
             ]
         )
 
@@ -192,12 +201,14 @@ def run_case(case: dict, cfg: dict, payload: dict, generator: str) -> dict:
     scored["latency_ms"] = latency_ms
     scored["agentic"] = cfg["agentic"]
     scored["generator"] = generator
+    scored["expected_structural_exposure"] = case.get("expected_structural_exposure", 0)
     scored["heuristic_poison"] = (
         heuristic_is_indirect_injection(_poison(docs[poison_id]["text"], family))
-        if family not in {"stale_acl", "cross_turn"}
+        if family not in {"stale_acl", "cross_turn", "same_tenant_bait"}
         else False
     )
     return scored
+
 
 
 def run_matrix(repeats: int = 3, split: str = "dev", generator: str = "extractive") -> dict:
