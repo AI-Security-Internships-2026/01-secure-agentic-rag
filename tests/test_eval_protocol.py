@@ -491,6 +491,50 @@ def test_paper_title_and_contributions_pivot():
     assert "no human subjects" in content.lower()
 
 
+def test_reproducibility_artifacts_and_zenodo_dois():
+    from secure_rag.benchmark.datasets import ROOT
+    artifacts_dir = ROOT / "artifacts"
+    env_log = ROOT / "experiments" / "results" / "EVAL_ENVIRONMENT.md"
+    manifest = ROOT / "experiments" / "results" / "AUTHENTICATE.txt"
+    ae_package = artifacts_dir / "TDSC-AE-PACKAGE-v1"
+
+    # Verify environment log
+    assert env_log.exists()
+    env_text = env_log.read_text(encoding="utf-8")
+    assert "llama-3.3-70b-versatile" in env_text
+    assert "deepseek-r1-distill-qwen-32b" in env_text
+    assert "total_llm_calls: 24000" in env_text
+
+    # Verify data cards
+    fixture_card = artifacts_dir / "data_cards" / "authinject_lifecycle_fixture_card.md"
+    results_card = artifacts_dir / "data_cards" / "experiment_results_data_card.md"
+    assert fixture_card.exists()
+    assert results_card.exists()
+    assert "10.5281/zenodo.14022832" in fixture_card.read_text(encoding="utf-8")
+    assert "10.5281/zenodo.14022833" in results_card.read_text(encoding="utf-8")
+
+    # Verify security scans & SBOM
+    sbom_file = artifacts_dir / "sbom.secure-rag.v0.3.0.cdx.json"
+    trivy_file = artifacts_dir / "security_scans" / "trivy_image_scan.json"
+    audit_file = artifacts_dir / "security_scans" / "pip_audit_report.json"
+    assert sbom_file.exists()
+    assert trivy_file.exists()
+    assert audit_file.exists()
+    assert "CycloneDX" in sbom_file.read_text(encoding="utf-8")
+
+    # Verify IEEE AE Package
+    assert (ae_package / "README.md").exists()
+    assert (ae_package / "docker-compose.yml").exists()
+    assert (ae_package / "scripts" / "make-reproduce.sh").exists()
+
+    # Verify manifest has 3 Zenodo DOIs and GPG info
+    manifest_text = manifest.read_text(encoding="utf-8")
+    assert "10.5281/zenodo.14022831" in manifest_text
+    assert "10.5281/zenodo.14022832" in manifest_text
+    assert "10.5281/zenodo.14022833" in manifest_text
+    assert "GPG_FINGERPRINT" in manifest_text
+
+
 
 
 

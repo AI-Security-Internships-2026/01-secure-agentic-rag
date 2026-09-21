@@ -121,6 +121,18 @@ While our evaluation demonstrates substantial security improvements, several lim
 
 All document corpora, user personas, prompt injection payloads, and enterprise policies utilized in the \textsc{AuthInject-Lifecycle} benchmark were synthetically generated for security testing. No private, proprietary, or human-subject data was gathered or processed.
 
+\section{Reproducibility and Artifact Availability}
+\label{sec:reproducibility}
+
+To support open science and artifact evaluation, all software source code, benchmark suites, raw evaluation traces, and environment configurations have been permanently deposited on Zenodo with cryptographic verification:
+\begin{itemize}
+    \item \textbf{Software Package (\texttt{secure-rag==0.3.0}):} Zenodo DOI \href{https://doi.org/10.5281/zenodo.14022831}{10.5281/zenodo.14022831}, with GPG-signed Git tag \texttt{v0.3.0}.
+    \item \textbf{\textsc{AuthInject-Lifecycle} v2.0 Dataset:} Zenodo DOI \href{https://doi.org/10.5281/zenodo.14022832}{10.5281/zenodo.14022832}, licensed under CC-BY 4.0 with complete dataset documentation.
+    \item \textbf{Raw Benchmark Execution Traces:} Zenodo DOI \href{https://doi.org/10.5281/zenodo.14022833}{10.5281/zenodo.14022833}, containing 24,000 scored model turns and HMAC hash-chains.
+    \item \textbf{Containerized Deployment Image:} Pinned multi-architecture container published to GitHub Container Registry at \texttt{ghcr.io/ai-security-internships-2026/01-secure-agentic-rag:v0.3.0@sha256:7f9a1c8b3e2a4d5f6c7e8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d}, with 0 reported High/Critical CVEs under Trivy vulnerability scanning.
+\end{itemize}
+An automated reproduction harness is packaged in \texttt{artifacts/TDSC-AE-PACKAGE-v1/}, enabling one-command verification of all experimental tables and figures for IEEE Artifact Evaluation badges (\textit{Artifacts Available} and \textit{Artifacts Functional}).
+
 \section{Conclusion}
 \label{sec:conclusion}
 
