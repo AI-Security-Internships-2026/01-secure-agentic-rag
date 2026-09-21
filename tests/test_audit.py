@@ -63,3 +63,31 @@ def test_audit_verify_sink_succeeds_on_stdout(monkeypatch):
         verify_audit_sink()
     finally:
         reset_settings()
+
+
+def test_tool_audit_events(capsys, monkeypatch):
+    monkeypatch.setenv("AUDIT_OUTPUT_DESTINATION", "stdout")
+    reset_settings()
+    try:
+        from secure_rag.agent.tools import execute_tool, parse_tool_calls
+        from secure_rag.authz.client import get_authz_client, reset_authz_client
+
+        reset_authz_client()
+        get_authz_client().write_relationships([("tool", "send_email", "caller", "user", "carol")])
+
+        # Allowed execution
+        execute_tool("send_email", "carol", {"to_address": "test@example.com", "body": "msg"}, check_authz=True)
+        # Denied execution
+        execute_tool("send_email", "alice", {"to_address": "test@example.com", "body": "msg"}, check_authz=True)
+        # Malformed parse
+        parse_tool_calls("<<<TOOL_CALL: broken(>>>")
+
+        captured = capsys.readouterr()
+        lines = [json.loads(line.replace("[AUDIT] ", "", 1)) for line in captured.out.strip().split("\n") if line.startswith("[AUDIT] ")]
+        events = [r["event"] for r in lines]
+        assert "tool.exec.allowed" in events
+        assert "tool.exec.denied" in events
+        assert "tool.parse.malformed" in events
+    finally:
+        reset_settings()
+

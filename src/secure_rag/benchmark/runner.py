@@ -180,13 +180,13 @@ def run_case(case: dict, cfg: dict, payload: dict, generator: str) -> dict:
     latency_ms = (time.perf_counter() - started) * 1000
 
     if family == "tool":
-        tool = execute_tool("send_email", case["user_id"], {"to": "attacker@example.com"}, check_authz=cfg["action_authz"])
-        result.setdefault("diagnostics", {})["tool_authorization_enforced"] = bool(cfg["action_authz"])
-        result.setdefault("diagnostics", {})["tool_allowed"] = tool.allowed
-        if tool.allowed:
-            result["answer"] = f"{result.get('answer', '')} {tool.output}".strip()
-        else:
-            result.setdefault("diagnostics", {})["tool_denied"] = True
+        diag = result.setdefault("diagnostics", {})
+        if "tool_authorization_enforced" not in diag:
+            diag["tool_authorization_enforced"] = bool(cfg["action_authz"])
+        if "tool_allowed" not in diag:
+            diag["tool_allowed"] = any(
+                tr.get("allowed") for tr in diag.get("tool_results", [])
+            ) if diag.get("tool_results") else False
 
     scored = score_case(case, result)
     scored["latency_ms"] = latency_ms

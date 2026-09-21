@@ -14,6 +14,7 @@ from secure_rag.agent.guardrails import (
     parse_structured_label,
 )
 from secure_rag.agent.llm import LLMBudget, LLMError, invoke_text
+from secure_rag.agent.tools import execute_tool, parse_tool_calls
 from secure_rag.audit.events import emit
 from secure_rag.authz.client import AuthorizationError, get_authz_client
 from secure_rag.retrieval.embeddings import get_embedder
@@ -73,6 +74,8 @@ class AgentState(TypedDict, total=False):
     llm_calls: int
     budget_max: int
     policy_version: int
+    tool_calls: list[dict[str, Any]]
+    tool_results: list[dict[str, Any]]
 
 
 NAIVE_GENERATOR_PROMPT = (
@@ -342,9 +345,61 @@ def rewrite_query(state: AgentState) -> dict:
     return {"anonymized_query": rewritten or state["anonymized_query"], "llm_calls": budget.used}
 
 
+def call_tools_node(state: AgentState) -> dict:
+    settings = get_settings()
+    diagnostics = dict(state.get("diagnostics", {}))
+    user_id = state.get("user_id", "")
+    tenant_id = state.get("tenant_id", "")
+    contexts = list(state.get("contexts", []))
+    query = state.get("anonymized_query", "")
+    enforce_authz = state.get("enable_action_authz", settings.enable_action_authz)
+
+    search_text = "\n".join(contexts + [query])
+    tool_calls = parse_tool_calls(search_text, user_id=user_id, tenant_id=tenant_id)
+
+    tool_results: list[dict[str, Any]] = []
+    if tool_calls:
+        diagnostics["tool_authorization_enforced"] = bool(enforce_authz)
+        diagnostics["tool_calls"] = tool_calls
+        any_allowed = False
+        any_denied = False
+
+        for call in tool_calls:
+            name = call["name"]
+            arguments = call.get("arguments", {})
+            result = execute_tool(
+                name,
+                user_id=user_id,
+                arguments=arguments,
+                check_authz=enforce_authz,
+                tenant_id=tenant_id,
+            )
+            tool_results.append({
+                "name": result.name,
+                "allowed": result.allowed,
+                "output": result.output,
+                "arguments": result.arguments,
+            })
+            if result.allowed:
+                any_allowed = True
+            else:
+                any_denied = True
+
+        diagnostics["tool_allowed"] = any_allowed
+        diagnostics["tool_denied"] = any_denied
+        diagnostics["tool_results"] = tool_results
+
+    return {
+        "tool_calls": tool_calls,
+        "tool_results": tool_results,
+        "diagnostics": diagnostics,
+    }
+
+
 def generate_answer(state: AgentState) -> dict:
     settings = get_settings()
     contexts = state.get("contexts", [])
+    tool_results = state.get("tool_results", [])
     if not contexts:
         if state.get("diagnostics", {}).get("indirect_injection_detected"):
             return {"answer": BLOCKED_INJECTION_MESSAGE}
@@ -353,11 +408,26 @@ def generate_answer(state: AgentState) -> dict:
     isolate = bool(state.get("enable_context_isolation", True))
     use_llm = state.get("generator") == "llm" or (state.get("generator") != "extractive" and settings.app_env != "test")
     if not use_llm:
-        return {"answer": extractive_generate(marked if not isolate else contexts, isolate=isolate)}
+        ans = extractive_generate(marked if not isolate else contexts, isolate=isolate)
+        if tool_results:
+            allowed_outputs = [tr["output"] for tr in tool_results if tr.get("allowed")]
+            denied_outputs = [tr["output"] for tr in tool_results if not tr.get("allowed")]
+            if allowed_outputs:
+                ans = f"{ans} {' '.join(allowed_outputs)}".strip()
+            elif denied_outputs:
+                ans = f"{ans} {' '.join(denied_outputs)}".strip()
+        return {"answer": ans}
     context_text = "\n\n".join(f"--- Chunk {i+1} ---\n{c}" for i, c in enumerate(marked))
     template = ISOLATED_GENERATOR_PROMPT if isolate else NAIVE_GENERATOR_PROMPT
     budget = _budget(state)
     answer = invoke_text(template.format(context_text=context_text, query=state["anonymized_query"]), budget=budget)
+    if tool_results:
+        allowed_outputs = [tr["output"] for tr in tool_results if tr.get("allowed")]
+        denied_outputs = [tr["output"] for tr in tool_results if not tr.get("allowed")]
+        if allowed_outputs:
+            answer = f"{answer} {' '.join(allowed_outputs)}".strip()
+        elif denied_outputs:
+            answer = f"{answer} {' '.join(denied_outputs)}".strip()
     return {"answer": answer, "llm_calls": budget.used}
 
 
@@ -382,7 +452,7 @@ def guard_output(state: AgentState) -> dict:
 
 def route_after_verification(state: AgentState) -> str:
     if state.get("contexts"):
-        return "generate"
+        return "call_tools"
     if state.get("loop_step", 0) < state.get("max_steps", 2):
         return "rewrite_query"
     return "generate"
@@ -393,6 +463,7 @@ def build_graph():
     workflow.add_node("guard_input", guard_input)
     workflow.add_node("retrieve", retrieve_node)
     workflow.add_node("verify_and_rerank", verify_and_rerank)
+    workflow.add_node("call_tools", call_tools_node)
     workflow.add_node("rewrite_query", rewrite_query)
     workflow.add_node("generate", generate_answer)
     workflow.add_node("guard_output", guard_output)
@@ -402,8 +473,9 @@ def build_graph():
     workflow.add_conditional_edges(
         "verify_and_rerank",
         route_after_verification,
-        {"generate": "generate", "rewrite_query": "rewrite_query"},
+        {"call_tools": "call_tools", "rewrite_query": "rewrite_query", "generate": "generate"},
     )
+    workflow.add_edge("call_tools", "generate")
     workflow.add_edge("rewrite_query", "retrieve")
     workflow.add_edge("generate", "guard_output")
     workflow.add_edge("guard_output", END)
@@ -469,6 +541,8 @@ def query_rag_system(
         "llm_calls": 0,
         "budget_max": settings.max_llm_calls,
         "policy_version": current_pol_ver,
+        "tool_calls": [],
+        "tool_results": [],
     }
     try:
         final_state = compiled_graph().invoke(initial)
@@ -478,6 +552,8 @@ def query_rag_system(
             "diagnostics": final_state.get("diagnostics", {}),
             "anonymized_query": final_state.get("anonymized_query", query),
             "retrieved": final_state.get("retrieved", []),
+            "tool_calls": final_state.get("tool_calls", []),
+            "tool_results": final_state.get("tool_results", []),
         }
     except (ValueError, AuthorizationError, LLMError) as exc:
         return {
@@ -487,3 +563,4 @@ def query_rag_system(
             "anonymized_query": query,
             "retrieved": [],
         }
+
