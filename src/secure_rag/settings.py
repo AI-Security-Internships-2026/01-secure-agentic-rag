@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     # sub-0.1 noise that broad recognizers emit on digit strings.
     pii_score_threshold: float = 0.35
 
+    audit_output_destination: Literal["file", "stdout"] = "stdout"
     audit_log_path: str = "logs/audit.jsonl"
 
     @property

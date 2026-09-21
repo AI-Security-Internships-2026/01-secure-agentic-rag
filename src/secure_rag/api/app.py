@@ -9,6 +9,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from secure_rag.api.routes import router
+from secure_rag.audit.events import verify_audit_sink
 from secure_rag.audit.otel import configure_telemetry
 from secure_rag.logging import configure_logging
 from secure_rag.settings import get_settings
@@ -20,6 +21,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
     configure_telemetry()
+    verify_audit_sink(settings)
     application = FastAPI(title="AuthInject-RAG", version="0.2.0")
     application.state.limiter = limiter
     application.include_router(router)
