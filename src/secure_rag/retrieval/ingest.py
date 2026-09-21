@@ -60,7 +60,6 @@ def ingest_texts(
         if viewer == owner_id:
             continue
         tuples.append(("document", document_id, "viewer", "user", viewer))
-        tuples.append(("tenant", tenant_id, "member", "user", viewer))
     tuples = list(dict.fromkeys(tuples))
 
     try:

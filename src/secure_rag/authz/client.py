@@ -73,13 +73,6 @@ class SpiceDBSimulator:
             for rel in allowed:
                 if (resource_type, resource_id, rel, subject_type, subject_id) in self.relationships:
                     return True
-            if permission == "view":
-                parents = [
-                    t[4]
-                    for t in self.relationships
-                    if t[0] == "document" and t[1] == resource_id and t[2] == "tenant" and t[3] == "tenant"
-                ]
-                return any(self.check_permission("tenant", tenant_id, "view", subject_type, subject_id) for tenant_id in parents)
             return False
         if resource_type == "chunk" and permission == "view":
             parents = [
