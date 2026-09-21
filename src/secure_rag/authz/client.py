@@ -24,6 +24,9 @@ class AuthzClient(Protocol):
         self, resource_type: str, resource_id: str, permission: str, subject_type: str, subject_id: str
     ) -> bool: ...
     def lookup_resources(self, resource_type: str, permission: str, subject_type: str, subject_id: str) -> list[str]: ...
+    def lookup_subjects(self, resource_type: str, resource_id: str, relation: str, subject_type: str = "user") -> list[str]: ...
+    def get_document_owner(self, document_id: str) -> str | None: ...
+    def document_exists(self, document_id: str) -> bool: ...
     def ensure_schema(self) -> None: ...
 
 
@@ -88,6 +91,24 @@ class SpiceDBSimulator:
         if resource_type == "document":
             ids.update({t[4] for t in self.relationships if t[3] == "document"})
         return [r_id for r_id in sorted(ids) if self.check_permission(resource_type, r_id, permission, subject_type, subject_id)]
+
+    def lookup_subjects(self, resource_type: str, resource_id: str, relation: str, subject_type: str = "user") -> list[str]:
+        return [
+            t[4]
+            for t in self.relationships
+            if t[0] == resource_type and t[1] == resource_id and t[2] == relation and t[3] == subject_type
+        ]
+
+    def get_document_owner(self, document_id: str) -> str | None:
+        owners = [
+            t[4]
+            for t in self.relationships
+            if t[0] == "document" and t[1] == document_id and t[2] == "owner" and t[3] == "user"
+        ]
+        return owners[0] if owners else None
+
+    def document_exists(self, document_id: str) -> bool:
+        return any(t[0] == "document" and t[1] == document_id for t in self.relationships)
 
 
 class RealSpiceDBClient:
@@ -201,6 +222,32 @@ class RealSpiceDBClient:
         except Exception as exc:
             logger.error("SpiceDB lookup failed: %s", exc)
             raise AuthorizationError("authorization lookup failed") from exc
+
+    def lookup_subjects(self, resource_type: str, resource_id: str, relation: str, subject_type: str = "user") -> list[str]:
+        from authzed.api.v1 import Consistency, LookupSubjectsRequest, ObjectReference
+
+        try:
+            request = LookupSubjectsRequest(
+                resource=ObjectReference(object_type=resource_type, object_id=resource_id),
+                permission=relation,
+                subject_object_type=subject_type,
+                consistency=Consistency(fully_consistent=True),
+            )
+            return [resp.subject.subject_object_id for resp in self.client.LookupSubjects(request)]
+        except Exception as exc:
+            logger.error("SpiceDB lookup_subjects failed: %s", exc)
+            raise AuthorizationError("authorization lookup_subjects failed") from exc
+
+    def get_document_owner(self, document_id: str) -> str | None:
+        try:
+            owners = self.lookup_subjects("document", document_id, "owner", "user")
+            return owners[0] if owners else None
+        except Exception as exc:
+            logger.error("SpiceDB get_document_owner failed: %s", exc)
+            return None
+
+    def document_exists(self, document_id: str) -> bool:
+        return self.get_document_owner(document_id) is not None
 
 
 _client: AuthzClient | None = None

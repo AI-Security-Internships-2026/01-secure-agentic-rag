@@ -34,12 +34,43 @@ def ingest_texts(
     viewers: list[str] | None = None,
     source: str = "inline",
     redact_pii: bool = True,
+    caller_id: str | None = None,
 ) -> dict:
     settings = get_settings()
     viewers = viewers or []
     store = get_vector_store(settings)
     authz = get_authz_client(settings)
     embedder = get_embedder(settings)
+
+    effective_caller = caller_id or owner_id
+    existing_owner = authz.get_document_owner(document_id)
+    is_existing = existing_owner is not None
+
+    if is_existing:
+        if not authz.check_permission("document", document_id, "edit", "user", effective_caller):
+            emit(
+                "document.overwrite_attempt.denied",
+                user_id=effective_caller,
+                document_id=document_id,
+                tenant_id=tenant_id,
+                extra={"reason": "caller is not owner/editor"},
+            )
+            raise AuthorizationError(f"Cannot overwrite document '{document_id}': caller is not owner/editor.")
+        if effective_caller == existing_owner:
+            effective_owner = owner_id
+            if effective_owner != existing_owner:
+                authz.delete_tuples([("document", document_id, "owner", "user", existing_owner)])
+                emit(
+                    "document.owner_reassigned",
+                    user_id=effective_caller,
+                    document_id=document_id,
+                    tenant_id=tenant_id,
+                    extra={"old_owner": existing_owner, "new_owner": effective_owner},
+                )
+        else:
+            effective_owner = existing_owner
+    else:
+        effective_owner = owner_id
 
     chunks: list[str] = []
     for text in texts:
@@ -52,12 +83,12 @@ def ingest_texts(
     vectors = embedder.embed(chunks, task="retrieval_document")
     points = []
     tuples = [
-        ("document", document_id, "owner", "user", owner_id),
+        ("document", document_id, "owner", "user", effective_owner),
         ("document", document_id, "tenant", "tenant", tenant_id),
-        ("tenant", tenant_id, "member", "user", owner_id),
+        ("tenant", tenant_id, "member", "user", effective_owner),
     ]
     for viewer in viewers:
-        if viewer == owner_id:
+        if viewer == effective_owner:
             continue
         tuples.append(("document", document_id, "viewer", "user", viewer))
     tuples = list(dict.fromkeys(tuples))
@@ -91,17 +122,18 @@ def ingest_texts(
         logger.exception("ingest failed; rolling back searchable vectors")
         store.delete_document(document_id)
         try:
-            authz.delete_relationships("document", document_id)
+            if not is_existing:
+                authz.delete_relationships("document", document_id)
         except Exception:
             logger.exception("SpiceDB rollback failed")
         raise AuthorizationError("ingestion aborted to avoid unauthorized searchable state") from exc
 
     emit(
         "document.ingested",
-        user_id=owner_id,
+        user_id=effective_owner,
         document_id=document_id,
         tenant_id=tenant_id,
-        extra={"chunk_count": len(chunks), "provenance": provenance},
+        extra={"chunk_count": len(chunks), "provenance": provenance, "caller_id": effective_caller},
     )
     return {"document_id": document_id, "chunk_count": len(chunks), "provenance": provenance}
 

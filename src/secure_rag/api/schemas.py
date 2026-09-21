@@ -23,6 +23,8 @@ class QueryRequest(BaseModel):
 class IngestRequest(BaseModel):
     document_id: str
     texts: list[str]
+    tenant_id: str = ""
+    owner_id: str = ""
     viewers: list[str] = Field(default_factory=list)
     redact_pii: bool = True
 

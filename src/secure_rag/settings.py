@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     enable_llm_injection_scan: bool = True
     enable_action_authz: bool = True
     enable_task_alignment: bool = False
+    allow_any_member_create_docs: bool = True
     max_agent_steps: int = 2
     max_llm_calls: int = 12
 

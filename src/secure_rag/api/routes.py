@@ -74,16 +74,64 @@ def query(body: QueryRequest, principal: Principal = Depends(get_principal)):
 
 @router.post("/ingest")
 def ingest(body: IngestRequest, principal: Principal = Depends(get_principal)):
+    settings = get_settings()
+    authz = get_authz_client(settings)
+    target_tenant_id = body.tenant_id if body.tenant_id else principal.tenant_id
+    requested_owner_id = body.owner_id if body.owner_id else principal.user_id
+
+    existing_owner = authz.get_document_owner(body.document_id)
+    if existing_owner is not None:
+        if not authz.check_permission("document", body.document_id, "edit", "user", principal.user_id):
+            from secure_rag.audit.events import emit
+
+            emit(
+                "document.overwrite_attempt.denied",
+                user_id=principal.user_id,
+                document_id=body.document_id,
+                tenant_id=target_tenant_id,
+                extra={"reason": "caller is not owner/editor"},
+            )
+            raise HTTPException(
+                status_code=403,
+                detail=f"Cannot overwrite document '{body.document_id}': caller is not owner/editor.",
+            )
+        if principal.user_id == existing_owner:
+            effective_owner = requested_owner_id
+        else:
+            effective_owner = existing_owner
+    else:
+        is_member = (principal.tenant_id == target_tenant_id) or authz.check_permission(
+            "tenant", target_tenant_id, "view", "user", principal.user_id
+        )
+        if not is_member:
+            from secure_rag.audit.events import emit
+
+            emit(
+                "document.overwrite_attempt.denied",
+                user_id=principal.user_id,
+                document_id=body.document_id,
+                tenant_id=target_tenant_id,
+                extra={"reason": "caller is not a member of target tenant"},
+            )
+            raise HTTPException(
+                status_code=403,
+                detail=f"Cannot create document: caller '{principal.user_id}' is not a member of tenant '{target_tenant_id}'.",
+            )
+        effective_owner = requested_owner_id
+
     try:
         return ingest_texts(
             body.document_id,
             body.texts,
-            owner_id=principal.user_id,
-            tenant_id=principal.tenant_id,
+            owner_id=effective_owner,
+            tenant_id=target_tenant_id,
             viewers=body.viewers,
             redact_pii=body.redact_pii,
+            caller_id=principal.user_id,
         )
     except AuthorizationError as exc:
+        if "Cannot overwrite" in str(exc) or "not owner/editor" in str(exc):
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
         raise HTTPException(status_code=503, detail=str(exc) or "authorization or dependency unavailable") from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
