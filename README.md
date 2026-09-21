@@ -1,6 +1,9 @@
 # AuthInject-RAG
 
+[![CI](https://github.com/AI-Security-Internships-2026/01-secure-agentic-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/AI-Security-Internships-2026/01-secure-agentic-rag/actions/workflows/ci.yml)
+
 Authorization-first agentic RAG for **combined** cross-tenant leakage and indirect prompt injection.
+
 
 CNIT/PNTLab Pisa · TECIP · Scuola Superiore Sant'Anna — AI Security Internship 2026
 
