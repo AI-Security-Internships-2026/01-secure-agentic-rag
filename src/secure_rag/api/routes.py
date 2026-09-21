@@ -46,6 +46,19 @@ def ready():
 
 @router.post("/query")
 def query(body: QueryRequest, principal: Principal = Depends(get_principal)):
+    settings = get_settings()
+    if settings.app_env == "production" and settings.production_enforce_pre_auth:
+        if body.filtering_mode == "post":
+            raise HTTPException(
+                status_code=403,
+                detail="Post-filter mode is not permitted in production profile.",
+            )
+        if body.filtering_mode == "research_baseline_none":
+            raise HTTPException(
+                status_code=403,
+                detail="Baseline-none mode is internal research-only; not available on production API.",
+            )
+
     result = query_rag_system(
         collection_name=body.document_id,
         query=body.query,

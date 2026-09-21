@@ -66,3 +66,95 @@ def test_action_authz_denied_for_non_caller():
     allowed = execute_tool("send_email", "carol")
     assert denied.allowed is False
     assert allowed.allowed is True
+
+
+def test_filtering_mode_none_rejected_production(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    from secure_rag.settings import reset_settings
+
+    reset_settings()
+    try:
+        client = TestClient(create_app())
+        token = create_token("alice", "finance")
+        response = client.post(
+            "/query",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"query": "test query", "filtering_mode": "research_baseline_none"},
+        )
+        assert response.status_code == 403
+        assert "Baseline-none mode is internal research-only; not available on production API." in response.json()["detail"]
+    finally:
+        reset_settings()
+
+
+def test_filtering_mode_post_rejected_production(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    from secure_rag.settings import reset_settings
+
+    reset_settings()
+    try:
+        client = TestClient(create_app())
+        token = create_token("alice", "finance")
+        response = client.post(
+            "/query",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"query": "test query", "filtering_mode": "post"},
+        )
+        assert response.status_code == 403
+        assert "Post-filter mode is not permitted in production profile." in response.json()["detail"]
+    finally:
+        reset_settings()
+
+
+def test_filtering_mode_bad_value_422(client):
+    token = create_token("alice", "finance")
+    response = client.post(
+        "/query",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"query": "test query", "filtering_mode": "banana"},
+    )
+    assert response.status_code == 422
+
+
+def test_internal_baseline_none_works_via_direct_call():
+    reset_vector_store()
+    reset_authz_client()
+    ingest_texts("finance-policy", ["secret CANARY_FIN_A1"], owner_id="alice", tenant_id="finance", redact_pii=False)
+    ingest_texts("eng-runbook", ["secret CANARY_ENG_B2"], owner_id="bob", tenant_id="engineering", redact_pii=False)
+    from secure_rag.agent.graph import query_rag_system
+
+    result = query_rag_system(
+        collection_name="",
+        query="secret CANARY_ENG_B2",
+        user_id="alice",
+        tenant_id="finance",
+        filtering_mode="research_baseline_none",
+        enable_indirect_injection_scan=False,
+    )
+    retrieved_docs = {item["document_id"] for item in result.get("retrieved", [])}
+    assert "eng-runbook" in retrieved_docs
+
+
+def test_pre_mode_works_in_production(monkeypatch):
+    reset_vector_store()
+    reset_authz_client()
+    monkeypatch.setenv("APP_ENV", "production")
+    from secure_rag.settings import reset_settings
+
+    reset_settings()
+    try:
+        ingest_texts("finance-policy", ["secret CANARY_FIN_A1"], owner_id="alice", tenant_id="finance", redact_pii=False)
+        ingest_texts("eng-runbook", ["secret CANARY_ENG_B2"], owner_id="bob", tenant_id="engineering", redact_pii=False)
+        client = TestClient(create_app())
+        token = create_token("alice", "finance")
+        response = client.post(
+            "/query",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"query": "secret CANARY_FIN_A1", "filtering_mode": "pre"},
+        )
+        assert response.status_code == 200
+        retrieved_docs = {item["document_id"] for item in response.json().get("retrieved", [])}
+        assert "finance-policy" in retrieved_docs
+        assert "eng-runbook" not in retrieved_docs
+    finally:
+        reset_settings()

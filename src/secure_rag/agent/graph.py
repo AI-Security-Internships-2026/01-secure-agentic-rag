@@ -20,7 +20,7 @@ from secure_rag.retrieval.pii import anonymize_text
 from secure_rag.retrieval.qdrant_store import RetrievedChunk, get_vector_store
 from secure_rag.settings import Settings, get_settings
 
-FilteringMode = Literal["none", "pre", "post"]
+FilteringMode = Literal["none", "pre", "post", "research_baseline_none"]
 
 
 class AgentState(TypedDict, total=False):
@@ -105,7 +105,7 @@ def retrieve_authorized(
         vector,
         limit=fetch_k,
         allowed_document_ids=allowed if filtering_mode == "pre" else None,
-        tenant_id=None if filtering_mode == "none" else tenant_id,
+        tenant_id=None if filtering_mode in ("none", "research_baseline_none") else tenant_id,
     )
     if collection_name and filtering_mode != "pre":
         hits = [h for h in hits if h.document_id == collection_name]

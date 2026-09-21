@@ -18,6 +18,7 @@ threat and this structural exposure jointly. Neither track replaces the other.
 - **Policy:** SpiceDB is the source of truth. Unavailable SpiceDB fails closed.
 - **Retrieval:** Unauthorized chunks must not enter generator or tool arguments (structural noninterference).
 - **Untrusted data:** Retrieved chunk text is always taint=`untrusted`.
+- **Baseline Modes Disclosure:** Baseline and unconstrained filtering modes (such as `research_baseline_none`) are internal research artifacts used exclusively for experimental benchmarking and evaluation, and are strictly prohibited from exposure on the production API surface.
 
 ## Adversary
 

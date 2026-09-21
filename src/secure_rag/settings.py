@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_env: Literal["test", "development", "production"] = "development"
+    production_enforce_pre_auth: bool = True
     log_level: str = "INFO"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
