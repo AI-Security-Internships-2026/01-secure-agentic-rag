@@ -403,6 +403,61 @@ def test_related_work_and_bibtex_expansion():
     assert r"\begin{table*}" in tex_text
 
 
+def test_paper_results_section_structure_and_figures():
+    from secure_rag.benchmark.datasets import ROOT
+    results_tex = ROOT / "paper" / "results.tex"
+    figures_dir = ROOT / "paper" / "figures"
+
+    assert results_tex.exists()
+    content = results_tex.read_text(encoding="utf-8")
+
+    # Verify all 10 subsections are present
+    expected_subsections = [
+        r"\subsection{Baseline Comparison: Full Configuration Matrix}",
+        r"\subsection{Same-Tenant Disjoint-Document Bait Breakdown}",
+        r"\subsection{Stale ACL Revocation and Cross-Turn Context Persistence}",
+        r"\subsection{Model-Chosen Tool-Action Security}",
+        r"\subsection{Ablation Analysis}",
+        r"\subsection{Cross-Model Generalization}",
+        r"\subsection{Performance Overhead and Latency Scaling}",
+        r"\subsection{Guardrail Detector Comparative Evaluation}",
+        r"\subsection{Audit Completeness and Cryptographic Integrity}",
+        r"\subsection{Statistical Significance and Hypothesis Testing}",
+    ]
+    for sub in expected_subsections:
+        assert sub in content, f"Missing subsection: {sub}"
+
+    # Verify all tables IV through XIII are present
+    expected_tables = [
+        r"\label{tab:headline_matrix}",
+        r"\label{tab:same_tenant_bait}",
+        r"\label{tab:stale_acl_results}",
+        r"\label{tab:tool_asr_results}",
+        r"\label{tab:ablation_study}",
+        r"\label{tab:cross_model}",
+        r"\label{tab:latency_benchmarks}",
+        r"\label{tab:detector_eval}",
+        r"\label{tab:audit_completeness}",
+        r"\label{tab:statistical_tests}",
+    ]
+    for tab in expected_tables:
+        assert tab in content, f"Missing table label: {tab}"
+
+    # Verify all 6 new figures are generated and present
+    expected_figures = [
+        "fig4_sequence_cross_turn_reval.svg",
+        "fig5_pareto_security_vs_utility.svg",
+        "fig6_violin_p95_concurrency.svg",
+        "fig7_cross_model_consistency.svg",
+        "fig8_ablation_failure_breakdown.svg",
+        "fig9_stale_acl_wilson_ci_gap.svg",
+    ]
+    for fig in expected_figures:
+        fig_path = figures_dir / fig
+        assert fig_path.exists(), f"Missing figure file: {fig}"
+        assert fig_path.stat().st_size > 500, f"Figure {fig} file size is suspiciously small"
+
+
 
 
 
