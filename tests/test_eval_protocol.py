@@ -458,6 +458,39 @@ def test_paper_results_section_structure_and_figures():
         assert fig_path.stat().st_size > 500, f"Figure {fig} file size is suspiciously small"
 
 
+def test_paper_title_and_contributions_pivot():
+    from secure_rag.benchmark.datasets import ROOT
+    main_tex = ROOT / "paper" / "main.tex"
+
+    assert main_tex.exists()
+    content = main_tex.read_text(encoding="utf-8")
+
+    # Verify Title
+    assert r"\title{Continuous Authorization over the Agentic-RAG Context Lifecycle}" in content
+
+    # Verify Contributions C1-C4
+    assert "C1 --- Multi-Point Reference Monitor Architecture" in content
+    assert "C2 --- \\textsc{AuthInject-Lifecycle} Benchmark" in content
+    assert "C3 --- Factorial Empirical Evaluation" in content
+    assert "C4 --- Open-Source Production Package" in content
+
+    # Verify Research Questions RQ1-RQ3
+    assert "RQ1 (Lifecycle Defense Efficacy)" in content
+    assert "RQ2 (Ablation and Overhead Tradeoffs)" in content
+    assert "RQ3 (Cross-Model Generalization)" in content
+
+    # Verify Formal Definitions and Invariants
+    assert "Definition 1 (Continuous Authorization Invariant)" in content
+    assert "Definition 2 (Stale Context Exposure Event)" in content
+    assert r"\mathrm{Allow}(u, \text{view}, c, t) = 1" in content
+    assert r"\mathrm{Allow}(u, \text{execute}, \omega, t) = 1" in content
+
+    # Verify Comparison with AFR and Limitations
+    assert "Comparison with AFR" in content
+    assert "stale-ACL revocation" in content
+    assert "no human subjects" in content.lower()
+
+
 
 
 
