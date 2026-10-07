@@ -6,7 +6,7 @@ import re
 import uuid
 from pathlib import Path
 
-from secure_rag.audit.events import emit
+from secure_rag.audit.events import emit, format_tuple
 from secure_rag.authz.client import AuthorizationError, get_authz_client
 from secure_rag.retrieval.embeddings import get_embedder
 from secure_rag.retrieval.pii import anonymize_text, chunk_text
@@ -55,11 +55,34 @@ def ingest_texts(
                 tenant_id=tenant_id,
                 extra={"reason": "caller is not owner/editor"},
             )
+            emit(
+                "authz.permission.denied",
+                user_id=effective_caller,
+                document_id=document_id,
+                tenant_id=tenant_id,
+                extra={
+                    "resource": f"document:{document_id}",
+                    "permission": "edit",
+                    "denied_at_step": "ingest",
+                    "reason": "caller is not owner/editor",
+                },
+            )
             raise AuthorizationError(f"Cannot overwrite document '{document_id}': caller is not owner/editor.")
         if effective_caller == existing_owner:
             effective_owner = owner_id
             if effective_owner != existing_owner:
                 authz.delete_tuples([("document", document_id, "owner", "user", existing_owner)])
+                emit(
+                    "authz.spicedb_tuple.delete",
+                    user_id=effective_caller,
+                    document_id=document_id,
+                    tenant_id=tenant_id,
+                    extra={
+                        "tuples": [format_tuple(("document", document_id, "owner", "user", existing_owner))],
+                        "deleter_principal": effective_caller,
+                        "reason_code": "owner_reassigned",
+                    },
+                )
                 emit(
                     "document.owner_reassigned",
                     user_id=effective_caller,
@@ -95,6 +118,13 @@ def ingest_texts(
 
     try:
         authz.write_relationships(tuples)
+        emit(
+            "authz.spicedb_tuple.write",
+            user_id=effective_caller,
+            document_id=document_id,
+            tenant_id=tenant_id,
+            extra={"tuples": [format_tuple(t) for t in tuples], "writer_principal": effective_caller},
+        )
         chunk_tuples = []
         for idx, (chunk, vector) in enumerate(zip(chunks, vectors)):
             chunk_id = f"{document_id}__{idx}"
@@ -116,6 +146,13 @@ def ingest_texts(
                 }
             )
         authz.write_relationships(chunk_tuples)
+        emit(
+            "authz.spicedb_tuple.write",
+            user_id=effective_caller,
+            document_id=document_id,
+            tenant_id=tenant_id,
+            extra={"tuples": [format_tuple(t) for t in chunk_tuples], "writer_principal": effective_caller},
+        )
         store.delete_document(tenant_id, document_id)
         store.upsert(points)
     except Exception as exc:
@@ -124,6 +161,17 @@ def ingest_texts(
         try:
             if not is_existing:
                 authz.delete_relationships("document", document_id)
+                emit(
+                    "authz.spicedb_tuple.delete",
+                    user_id=effective_caller,
+                    document_id=document_id,
+                    tenant_id=tenant_id,
+                    extra={
+                        "tuples": [f"document:{document_id}#*@*", f"chunk:*#parent_document@document:{document_id}"],
+                        "deleter_principal": effective_caller,
+                        "reason_code": "ingest_rollback",
+                    },
+                )
         except Exception:
             logger.exception("SpiceDB rollback failed")
         raise AuthorizationError("ingestion aborted to avoid unauthorized searchable state") from exc

@@ -33,6 +33,11 @@ spec:
               value: {{ .Values.audit.destination | default "stdout" | quote }}
             - name: AUDIT_LOG_PATH
               value: "/app/logs/audit.jsonl"
+            - name: AUDIT_HMAC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.audit.hmacSecret.name | default "authinject-secrets" | quote }}
+                  key: {{ .Values.audit.hmacSecret.key | default "audit-hmac-secret" | quote }}
           readinessProbe:
             httpGet:
               path: /ready

@@ -53,6 +53,11 @@ spec:
                 secretKeyRef:
                   name: authinject-secrets
                   key: spicedb-preshared-key
+            - name: AUDIT_HMAC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: authinject-secrets
+                  key: audit-hmac-secret
           resources:
             requests:
               cpu: 250m

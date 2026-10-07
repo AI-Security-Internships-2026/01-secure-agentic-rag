@@ -167,6 +167,17 @@ def guard_input(state: AgentState) -> dict:
             ),
             {"SAFE", "MALICIOUS"},
         )
+        if label == "MALICIOUS" or (label is None and settings.llm_fail_closed):
+            emit(
+                "guardrail.input_failed",
+                user_id=state.get("user_id", ""),
+                document_id=state.get("collection_name", "") or "",
+                tenant_id=state.get("tenant_id", "") or "",
+                extra={
+                    "guardrail_name": "llm_input_classifier",
+                    "reject_reason": "malicious" if label == "MALICIOUS" else "invalid_label_fail_closed",
+                },
+            )
         if label == "MALICIOUS":
             raise ValueError("Security Alert: Prompt injection or malicious instruction detected.")
         if label is None and settings.llm_fail_closed:
@@ -230,7 +241,12 @@ def retrieve_node(state: AgentState) -> dict:
                 user_id=user_id,
                 document_id="unknown",
                 tenant_id=t_id,
-                extra={"reason": "missing_provenance"},
+                extra={
+                    "reason": "missing_provenance",
+                    "chunk_ref": chunk_id or "unknown",
+                    "old_policy_version": meta.get("retrieved_at_policy_version"),
+                    "current_policy_version": current_policy_ver,
+                },
             )
             continue
 
@@ -254,7 +270,7 @@ def retrieve_node(state: AgentState) -> dict:
                 user_id=user_id,
                 document_id=doc_id,
                 tenant_id=t_id,
-                extra={"chunk_id": chunk_id},
+                extra={"chunk_ref": chunk_id or f"{doc_id}__prior", "policy_version": current_policy_ver},
             )
         else:
             stale_dropped += 1
@@ -263,7 +279,12 @@ def retrieve_node(state: AgentState) -> dict:
                 user_id=user_id,
                 document_id=doc_id,
                 tenant_id=t_id,
-                extra={"chunk_id": chunk_id, "reason": "permission_revoked"},
+                extra={
+                    "reason": "permission_revoked",
+                    "chunk_ref": chunk_id or f"{doc_id}__prior",
+                    "old_policy_version": meta.get("retrieved_at_policy_version"),
+                    "current_policy_version": current_policy_ver,
+                },
             )
 
     merged["cross_turn_prior_chunks"] = len(revalidated_contexts)
@@ -294,6 +315,11 @@ def verify_and_rerank(state: AgentState) -> dict:
             and settings.app_env != "test",
             budget=budget,
             settings=settings,
+            audit={
+                "user_id": state.get("user_id", ""),
+                "tenant_id": state.get("tenant_id", "") or "",
+                "chunk_ids": [item.get("chunk_id", "") for item in state.get("retrieved", [])],
+            },
         )
         prior = bool(diagnostics.get("indirect_injection_detected"))
         diagnostics.update(scan_diag)
