@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 from secure_rag.api.app import create_app
 from secure_rag.api.auth import create_token
-from secure_rag.authz.client import get_authz_client, reset_authz_client
+from secure_rag.authz.client import document_ref, get_authz_client, reset_authz_client
 from secure_rag.retrieval.ingest import ingest_texts
 from secure_rag.retrieval.qdrant_store import reset_vector_store
 
@@ -199,7 +199,7 @@ def test_ingest_overwrite_no_permission_403(client):
     assert res1.status_code == 200
 
     authz = get_authz_client()
-    assert authz.get_document_owner("board-minutes-2026-q1") == "alice"
+    assert authz.get_document_owner(document_ref("engineering", "board-minutes-2026-q1")) == "alice"
 
     # Bob attempts to overwrite
     res2 = client.post(
@@ -211,7 +211,7 @@ def test_ingest_overwrite_no_permission_403(client):
     assert "caller is not owner/editor" in res2.json()["detail"]
 
     # Owner remains Alice
-    assert authz.get_document_owner("board-minutes-2026-q1") == "alice"
+    assert authz.get_document_owner(document_ref("engineering", "board-minutes-2026-q1")) == "alice"
 
 
 def test_ingest_editor_overwrite_allowed(client):
@@ -226,7 +226,7 @@ def test_ingest_editor_overwrite_allowed(client):
     )
 
     authz = get_authz_client()
-    authz.write_relationships([("document", "doc_editable", "editor", "user", "bob")])
+    authz.write_relationships([("document", document_ref("engineering", "doc_editable"), "editor", "user", "bob")])
 
     # Bob overwrites as editor
     res = client.post(
@@ -237,7 +237,7 @@ def test_ingest_editor_overwrite_allowed(client):
     assert res.status_code == 200
 
     # Owner must still be Alice
-    assert authz.get_document_owner("doc_editable") == "alice"
+    assert authz.get_document_owner(document_ref("engineering", "doc_editable")) == "alice"
 
 
 def test_ingest_owner_overwrite_allowed(client):
@@ -257,7 +257,7 @@ def test_ingest_owner_overwrite_allowed(client):
         json={"document_id": "doc_owner_repeat", "texts": ["Version 2"], "redact_pii": False},
     )
     assert res2.status_code == 200
-    assert get_authz_client().get_document_owner("doc_owner_repeat") == "alice"
+    assert get_authz_client().get_document_owner(document_ref("engineering", "doc_owner_repeat")) == "alice"
 
 
 def test_ingest_owner_transfer_allowed_only_by_owner(client):
@@ -270,7 +270,7 @@ def test_ingest_owner_transfer_allowed_only_by_owner(client):
         json={"document_id": "doc_transfer", "texts": ["Initial content"], "redact_pii": False},
     )
     authz = get_authz_client()
-    assert authz.get_document_owner("doc_transfer") == "alice"
+    assert authz.get_document_owner(document_ref("engineering", "doc_transfer")) == "alice"
 
     # Alice transfers to Carol
     res = client.post(
@@ -279,7 +279,7 @@ def test_ingest_owner_transfer_allowed_only_by_owner(client):
         json={"document_id": "doc_transfer", "texts": ["Transferred content"], "owner_id": "carol", "redact_pii": False},
     )
     assert res.status_code == 200
-    assert authz.get_document_owner("doc_transfer") == "carol"
+    assert authz.get_document_owner(document_ref("engineering", "doc_transfer")) == "carol"
 
 
 def test_ingest_editor_cannot_transfer_owner(client):
@@ -293,7 +293,7 @@ def test_ingest_editor_cannot_transfer_owner(client):
         json={"document_id": "doc_editor_preserve", "texts": ["Initial content"], "redact_pii": False},
     )
     authz = get_authz_client()
-    authz.write_relationships([("document", "doc_editor_preserve", "editor", "user", "bob")])
+    authz.write_relationships([("document", document_ref("engineering", "doc_editor_preserve"), "editor", "user", "bob")])
 
     res = client.post(
         "/ingest",
@@ -302,7 +302,7 @@ def test_ingest_editor_cannot_transfer_owner(client):
     )
     assert res.status_code == 200
     # Owner remains Alice, NOT transferred to Bob
-    assert authz.get_document_owner("doc_editor_preserve") == "alice"
+    assert authz.get_document_owner(document_ref("engineering", "doc_editor_preserve")) == "alice"
 
 
 def test_ingest_new_doc_allowed_for_tenant_member(client):
@@ -314,7 +314,7 @@ def test_ingest_new_doc_allowed_for_tenant_member(client):
         json={"document_id": "dave_new_doc", "texts": ["Dave content"], "redact_pii": False},
     )
     assert res.status_code == 200
-    assert get_authz_client().get_document_owner("dave_new_doc") == "dave"
+    assert get_authz_client().get_document_owner(document_ref("engineering", "dave_new_doc")) == "dave"
 
 
 def test_ingest_cross_tenant_forbidden_403(client):

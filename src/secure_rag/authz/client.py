@@ -16,6 +16,30 @@ class AuthorizationError(RuntimeError):
     """Raised when authorization cannot be evaluated safely."""
 
 
+TENANT_SEPARATOR = "/"
+
+
+def document_ref(tenant_id: str, document_id: str) -> str:
+    """SpiceDB object id for a document; document ids are only unique within a tenant."""
+    if not tenant_id or TENANT_SEPARATOR in tenant_id:
+        raise AuthorizationError(f"invalid tenant_id for authorization: {tenant_id!r}")
+    if not document_id:
+        raise AuthorizationError("document_id is required for authorization")
+    return f"{tenant_id}{TENANT_SEPARATOR}{document_id}"
+
+
+def chunk_ref(tenant_id: str, chunk_id: str) -> str:
+    return document_ref(tenant_id, chunk_id)
+
+
+def split_ref(object_id: str) -> tuple[str, str]:
+    """Inverse of document_ref; returns ("", object_id) for un-namespaced ids."""
+    tenant_id, sep, local_id = object_id.partition(TENANT_SEPARATOR)
+    if not sep:
+        return "", object_id
+    return tenant_id, local_id
+
+
 class AuthzClient(Protocol):
     def write_relationships(self, tuples: list[RelationTuple]) -> None: ...
     def delete_relationships(self, resource_type: str, resource_id: str | None = None) -> None: ...

@@ -16,7 +16,7 @@ from secure_rag.agent.guardrails import (
 from secure_rag.agent.llm import LLMBudget, LLMError, invoke_text
 from secure_rag.agent.tools import execute_tool, parse_tool_calls
 from secure_rag.audit.events import emit
-from secure_rag.authz.client import AuthorizationError, get_authz_client
+from secure_rag.authz.client import AuthorizationError, chunk_ref, document_ref, get_authz_client, split_ref
 from secure_rag.retrieval.embeddings import get_embedder
 from secure_rag.retrieval.pii import anonymize_text
 from secure_rag.retrieval.qdrant_store import RetrievedChunk, get_vector_store
@@ -123,21 +123,26 @@ def retrieve_authorized(
         "structural_exposure": [],
     }
     vector = embedder.embed([query], task="retrieval_query")[0]
-    allowed: list[str] | None = None
+    allowed_by_tenant: dict[str, list[str]] | None = None
     if filtering_mode == "pre":
         authz = get_authz_client(settings)
-        allowed = authz.lookup_resources("document", "view", "user", user_id)
-        diagnostics["allowed_documents"] = allowed
-        if collection_name and collection_name not in allowed:
+        allowed_by_tenant = {}
+        for ref in authz.lookup_resources("document", "view", "user", user_id):
+            ref_tenant, doc_id = split_ref(ref)
+            if not ref_tenant or (tenant_id and ref_tenant != tenant_id):
+                continue
+            if collection_name and doc_id != collection_name:
+                continue
+            allowed_by_tenant.setdefault(ref_tenant, []).append(doc_id)
+        diagnostics["allowed_documents"] = sorted({d for docs in allowed_by_tenant.values() for d in docs})
+        if collection_name and not allowed_by_tenant:
             return [], diagnostics
-        if collection_name:
-            allowed = [collection_name]
     fetch_k = n_results * 4 if filtering_mode == "post" else n_results
     hits = store.search(
         vector,
         limit=fetch_k,
-        allowed_document_ids=allowed if filtering_mode == "pre" else None,
         tenant_id=None if filtering_mode in ("none", "research_baseline_none") else tenant_id,
+        allowed_by_tenant=allowed_by_tenant,
     )
     if collection_name and filtering_mode != "pre":
         hits = [h for h in hits if h.document_id == collection_name]
@@ -147,7 +152,7 @@ def retrieve_authorized(
         kept: list[RetrievedChunk] = []
         for hit in hits:
             diagnostics["permission_checks_count"] += 1
-            if authz.check_permission("chunk", hit.chunk_id, "view", "user", user_id):
+            if hit.tenant_id and authz.check_permission("chunk", chunk_ref(hit.tenant_id, hit.chunk_id), "view", "user", user_id):
                 kept.append(hit)
                 if len(kept) >= n_results:
                     break
@@ -239,7 +244,7 @@ def retrieve_node(state: AgentState) -> dict:
             continue
 
         # Check current SpiceDB authorization
-        is_allowed = authz.check_permission("document", doc_id, "view", "user", user_id)
+        is_allowed = bool(t_id) and authz.check_permission("document", document_ref(t_id, doc_id), "view", "user", user_id)
         if is_allowed:
             revalidated_contexts.append(ctx_text)
             revalidated_retrieved.append(

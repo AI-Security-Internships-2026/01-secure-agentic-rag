@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from secure_rag.agent.graph import query_rag_system
 from secure_rag.api.auth import create_token
-from secure_rag.authz.client import get_authz_client
+from secure_rag.authz.client import get_authz_client, split_ref
 from secure_rag.logging import configure_logging
 from secure_rag.retrieval.ingest import ingest_pdf
 from secure_rag.retrieval.qdrant_store import get_vector_store
@@ -32,7 +32,8 @@ def main() -> None:
             mode = input("mode [pre|post|none]: ").strip() or "pre"
             continue
         if choice == "3":
-            allowed = get_authz_client().lookup_resources("document", "view", "user", user_id)
+            refs = get_authz_client().lookup_resources("document", "view", "user", user_id)
+            allowed = [doc_id for ref_tenant, doc_id in map(split_ref, refs) if ref_tenant == tenant_id]
             print("allowed documents:", allowed)
             print("indexed:", get_vector_store().list_documents(allowed))
             continue

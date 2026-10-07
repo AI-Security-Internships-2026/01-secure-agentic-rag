@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from secure_rag.agent.graph import query_rag_system
 from secure_rag.api.auth import Principal, create_token, get_principal
 from secure_rag.api.schemas import IngestRequest, QueryRequest, TokenRequest
-from secure_rag.authz.client import AuthorizationError, get_authz_client
+from secure_rag.authz.client import AuthorizationError, document_ref, get_authz_client, split_ref
 from secure_rag.retrieval.ingest import ingest_texts
 from secure_rag.retrieval.qdrant_store import get_vector_store
 from secure_rag.settings import get_settings
@@ -79,9 +79,13 @@ def ingest(body: IngestRequest, principal: Principal = Depends(get_principal)):
     target_tenant_id = body.tenant_id if body.tenant_id else principal.tenant_id
     requested_owner_id = body.owner_id if body.owner_id else principal.user_id
 
-    existing_owner = authz.get_document_owner(body.document_id)
+    try:
+        doc_ref = document_ref(target_tenant_id, body.document_id)
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    existing_owner = authz.get_document_owner(doc_ref)
     if existing_owner is not None:
-        if not authz.check_permission("document", body.document_id, "edit", "user", principal.user_id):
+        if not authz.check_permission("document", doc_ref, "edit", "user", principal.user_id):
             from secure_rag.audit.events import emit
 
             emit(
@@ -141,7 +145,8 @@ def ingest(body: IngestRequest, principal: Principal = Depends(get_principal)):
 
 @router.get("/permissions")
 def permissions(principal: Principal = Depends(get_principal)):
-    docs = get_authz_client().lookup_resources("document", "view", "user", principal.user_id)
+    refs = get_authz_client().lookup_resources("document", "view", "user", principal.user_id)
+    docs = [doc_id for tenant_id, doc_id in map(split_ref, refs) if tenant_id == principal.tenant_id]
     return {"user_id": principal.user_id, "tenant_id": principal.tenant_id, "documents": docs}
 
 

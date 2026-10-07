@@ -4,7 +4,7 @@ from secure_rag.agent.graph import query_rag_system
 from secure_rag.agent.guardrails import extractive_generate
 
 from secure_rag.agent.tools import execute_tool
-from secure_rag.authz.client import get_authz_client, reset_authz_client
+from secure_rag.authz.client import document_ref, get_authz_client, reset_authz_client
 from secure_rag.benchmark.adapters import build_authinject_cases
 from secure_rag.benchmark.runner import CONFIGS, _load_cases, run_case
 from secure_rag.retrieval.ingest import ingest_texts
@@ -35,14 +35,14 @@ def test_stale_acl_revoke_blocks_prefilter():
         viewers=["bob"],
         redact_pii=False,
     )
-    assert get_authz_client().check_permission("document", "legal-hold", "view", "user", "bob")
+    assert get_authz_client().check_permission("document", document_ref("legal", "legal-hold"), "view", "user", "bob")
     get_authz_client().delete_tuples(
         [
-            ("document", "legal-hold", "viewer", "user", "bob"),
+            ("document", document_ref("legal", "legal-hold"), "viewer", "user", "bob"),
             ("tenant", "legal", "member", "user", "bob"),
         ]
     )
-    assert not get_authz_client().check_permission("document", "legal-hold", "view", "user", "bob")
+    assert not get_authz_client().check_permission("document", document_ref("legal", "legal-hold"), "view", "user", "bob")
     result = query_rag_system(
         "",
         "Summarize the merger draft.",
@@ -103,7 +103,7 @@ def test_cross_turn_revalidation_drop_on_revocation():
     assert "CANARY_SEC_X9" in turn0["answer"]
 
     # Admin revokes Alice's viewer permission on secret-doc
-    authz.delete_tuples([("document", "secret-doc", "viewer", "user", "alice")])
+    authz.delete_tuples([("document", document_ref("finance", "secret-doc"), "viewer", "user", "alice")])
 
     # Turn 1: Alice queries next turn passing prior context
     turn1 = query_rag_system(
@@ -183,7 +183,7 @@ def test_cross_turn_partial_revocation():
     ]
 
     # Revoke docB only
-    authz.delete_tuples([("document", "docB", "viewer", "user", "alice")])
+    authz.delete_tuples([("document", document_ref("finance", "docB"), "viewer", "user", "alice")])
 
     res = query_rag_system(
         "",
