@@ -1,0 +1,15 @@
+{{- if and .Values.audit .Values.audit.persistence .Values.audit.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "authinject.name" . }}-audit-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.audit.persistence.storageClassName }}
+  storageClassName: {{ .Values.audit.persistence.storageClassName | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.audit.persistence.size | default "1Gi" }}
+{{- end }}

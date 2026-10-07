@@ -15,6 +15,8 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
       containers:
         - name: api
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -27,6 +29,10 @@ spec:
               value: {{ .Values.env.SPICEDB_ENDPOINT | quote }}
             - name: QDRANT_URL
               value: {{ .Values.env.QDRANT_URL | quote }}
+            - name: AUDIT_OUTPUT_DESTINATION
+              value: {{ .Values.audit.destination | default "stdout" | quote }}
+            - name: AUDIT_LOG_PATH
+              value: "/app/logs/audit.jsonl"
           readinessProbe:
             httpGet:
               path: /ready

@@ -17,6 +17,11 @@ resources:
     cpu: "1"
     memory: 2Gi
 audit:
+  # "stdout" (default) or "file"; file mode writes /app/logs/audit.jsonl on the volume below.
+  destination: stdout
+  # Disabled: in-memory emptyDir (64Mi). Enabled: a ReadWriteOnce PVC, which every
+  # replica shares, so use it with replicaCount: 1 (one writer keeps one hash chain).
   persistence:
     enabled: false
     size: 1Gi
+    storageClassName: ""
