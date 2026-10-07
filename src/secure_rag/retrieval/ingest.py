@@ -85,7 +85,6 @@ def ingest_texts(
     tuples = [
         ("document", document_id, "owner", "user", effective_owner),
         ("document", document_id, "tenant", "tenant", tenant_id),
-        ("tenant", tenant_id, "member", "user", effective_owner),
     ]
     for viewer in viewers:
         if viewer == effective_owner:

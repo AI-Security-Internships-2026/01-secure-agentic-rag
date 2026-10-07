@@ -259,3 +259,31 @@ def test_cross_doc_query_isolation_integration():
     assert "threat_intel_42" not in retrieved_docs
     assert "CANARY_MALWARE_42" not in result["answer"]
 
+
+
+def test_schema_document_view_has_no_tenant_arrow():
+    from importlib import resources
+
+    schema = resources.files("secure_rag.authz").joinpath("schema.zed").read_text(encoding="utf-8")
+    document_block = schema.split("definition document", 1)[1].split("definition", 1)[0]
+    assert "tenant->" not in document_block
+
+
+def test_ingest_does_not_grant_tenant_membership():
+    """Ingesting (or naming someone as owner/viewer) must never make them a tenant member."""
+    reset_vector_store()
+    reset_authz_client()
+    authz = get_authz_client()
+
+    ingest_texts(
+        "eng_doc_owned_by_outsider",
+        ["Engineering doc"],
+        owner_id="mallory",
+        tenant_id="engineering",
+        viewers=["guest"],
+        redact_pii=False,
+    )
+
+    assert authz.check_permission("tenant", "engineering", "view", "user", "mallory") is False
+    assert authz.check_permission("tenant", "engineering", "view", "user", "guest") is False
+    assert not [t for t in authz.relationships if t[0] == "tenant"]
