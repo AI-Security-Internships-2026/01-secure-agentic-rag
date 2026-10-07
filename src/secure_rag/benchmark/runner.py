@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import random
@@ -13,12 +12,12 @@ from secure_rag.agent.graph import query_rag_system
 from secure_rag.agent.guardrails import heuristic_is_indirect_injection
 from secure_rag.agent.tools import execute_tool
 from secure_rag.authz.client import get_authz_client, reset_authz_client
-from secure_rag.benchmark.adapters import _poison, build_authinject_cases
+from secure_rag.benchmark.adapters import _poison, write_fixture
 from secure_rag.benchmark.datasets import fixture_path
 from secure_rag.benchmark.scoring import dump_jsonl, mcnemar_test, score_case, summarize
 from secure_rag.retrieval.ingest import ingest_texts
 from secure_rag.retrieval.qdrant_store import reset_vector_store
-from secure_rag.settings import reset_settings
+from secure_rag.settings import get_settings, reset_settings
 
 # 11 Configurations: 4 Baselines (B0-B3), 2 Proposed (P1-P2), 5 Ablations (A1-A5)
 CONFIGS: dict[str, dict[str, Any]] = {
@@ -231,14 +230,14 @@ CROSS_TURN_PROBE = "Summarize payroll, break-glass rotation, and privilege-revie
 def _load_cases() -> dict:
     path = fixture_path("authinject_cases.json")
     if not path.exists():
-        build_authinject_cases()
+        write_fixture()
     else:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
             if payload.get("version") != "2.0":
-                build_authinject_cases()
+                write_fixture()
         except Exception:
-            build_authinject_cases()
+            write_fixture()
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -256,6 +255,7 @@ def _query_kwargs(case: dict, cfg: dict, generator: str) -> dict:
         "enable_llm_injection_scan": cfg.get("llm_scan", False),
         "enable_agent_loop": cfg.get("agentic", False),
         "enable_action_authz": cfg.get("action_authz", False),
+        "enable_continuous_auth": cfg.get("continuous_auth", True),
         "generator": generator,
     }
 
@@ -296,6 +296,8 @@ def run_case(case: dict, cfg: dict, payload: dict, generator: str = "extractive"
     _ingest_corpus(payload, poison_id, family)
 
     kwargs = _query_kwargs(case, cfg, generator)
+    if generator == "llm":
+        get_settings().llm_model = model_id
     started = time.perf_counter()
     if family == "cross_turn":
         first = query_rag_system(**{**kwargs, "query": CROSS_TURN_PROBE})
@@ -324,7 +326,7 @@ def run_case(case: dict, cfg: dict, payload: dict, generator: str = "extractive"
     scored["latency_ms"] = latency_ms
     scored["agentic"] = cfg.get("agentic", False)
     scored["generator"] = generator
-    scored["model_id"] = model_id
+    scored["model_id"] = model_id if generator == "llm" else "none"
     scored["expected_structural_exposure"] = case.get("expected_structural_exposure", 0)
     scored["heuristic_poison"] = (
         heuristic_is_indirect_injection(_poison(docs[poison_id]["text"], family))
@@ -346,6 +348,11 @@ def run_matrix(
 ) -> dict[str, Any]:
     """Execute evaluation matrix across configurations, models, and repeats."""
     models = models or ["llama-3.3-70b-versatile"]
+    if generator != "llm" and len(models) > 1:
+        raise ValueError(
+            f"generator={generator!r} never calls a model, so a {len(models)}-model run would only "
+            "relabel identical rows; pass --generator llm for a cross-model evaluation"
+        )
     selected_configs = {k: v for k, v in CONFIGS.items() if not configs or k in configs}
     payload = _load_cases()
     cases = [c for c in payload["cases"] if c.get("split") == split or split == "all"]
@@ -385,7 +392,7 @@ def run_matrix(
                     scored["config"] = cfg_name
                     scored["repeat"] = repeat
                     scored["repeat_seed"] = rep_seed
-                    scored["request_id"] = hashlib.sha256(f"{run_key}:{time.time()}".encode()).hexdigest()[:16]
+                    scored["run_key"] = run_key
                     all_rows.append(scored)
 
                     if out_path:

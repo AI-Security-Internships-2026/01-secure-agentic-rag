@@ -67,3 +67,6 @@ chroma_db/
 chromadb/
 qdrant_storage/
 benchmarks/.cache/
+
+# Paper sources live on Overleaf, not in this repo
+paper/
