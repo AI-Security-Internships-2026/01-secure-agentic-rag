@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 from secure_rag.api.app import create_app
 from secure_rag.api.auth import create_token
-from secure_rag.authz.client import get_authz_client, reset_authz_client
+from secure_rag.authz.client import document_ref, get_authz_client, reset_authz_client
 from secure_rag.retrieval.ingest import ingest_texts
 from secure_rag.retrieval.qdrant_store import reset_vector_store
 
@@ -135,16 +135,39 @@ def test_internal_baseline_none_works_via_direct_call():
     assert "eng-runbook" in retrieved_docs
 
 
+def test_unknown_filtering_mode_fails_closed_on_direct_call():
+    reset_vector_store()
+    reset_authz_client()
+    ingest_texts("eng-runbook", ["secret CANARY_ENG_B2"], owner_id="bob", tenant_id="engineering", redact_pii=False)
+    from secure_rag.agent.graph import query_rag_system
+
+    result = query_rag_system(
+        collection_name="",
+        query="secret CANARY_ENG_B2",
+        user_id="alice",
+        tenant_id="engineering",
+        filtering_mode="banana",
+        enable_indirect_injection_scan=False,
+    )
+    assert result["retrieved"] == []
+    assert "CANARY_ENG_B2" not in result["answer"]
+
+
 def test_pre_mode_works_in_production(monkeypatch):
     reset_vector_store()
     reset_authz_client()
+    # Production refuses the in-memory SpiceDB simulator (fail closed), so seed it
+    # under APP_ENV=test and keep the cached client when switching profiles.
+    ingest_texts("finance-policy", ["secret CANARY_FIN_A1"], owner_id="alice", tenant_id="finance", redact_pii=False)
+    ingest_texts("eng-runbook", ["secret CANARY_ENG_B2"], owner_id="bob", tenant_id="engineering", redact_pii=False)
+    # Production routes every agent step through the LLM; stub it out.
+    monkeypatch.setattr("secure_rag.agent.graph.invoke_text", lambda *args, **kwargs: "SAFE")
+    monkeypatch.setattr("secure_rag.agent.llm.invoke_text", lambda *args, **kwargs: "SAFE")
     monkeypatch.setenv("APP_ENV", "production")
     from secure_rag.settings import reset_settings
 
     reset_settings()
     try:
-        ingest_texts("finance-policy", ["secret CANARY_FIN_A1"], owner_id="alice", tenant_id="finance", redact_pii=False)
-        ingest_texts("eng-runbook", ["secret CANARY_ENG_B2"], owner_id="bob", tenant_id="engineering", redact_pii=False)
         client = TestClient(create_app())
         token = create_token("alice", "finance")
         response = client.post(
@@ -176,7 +199,7 @@ def test_ingest_overwrite_no_permission_403(client):
     assert res1.status_code == 200
 
     authz = get_authz_client()
-    assert authz.get_document_owner("board-minutes-2026-q1") == "alice"
+    assert authz.get_document_owner(document_ref("engineering", "board-minutes-2026-q1")) == "alice"
 
     # Bob attempts to overwrite
     res2 = client.post(
@@ -188,7 +211,7 @@ def test_ingest_overwrite_no_permission_403(client):
     assert "caller is not owner/editor" in res2.json()["detail"]
 
     # Owner remains Alice
-    assert authz.get_document_owner("board-minutes-2026-q1") == "alice"
+    assert authz.get_document_owner(document_ref("engineering", "board-minutes-2026-q1")) == "alice"
 
 
 def test_ingest_editor_overwrite_allowed(client):
@@ -203,7 +226,7 @@ def test_ingest_editor_overwrite_allowed(client):
     )
 
     authz = get_authz_client()
-    authz.write_relationships([("document", "doc_editable", "editor", "user", "bob")])
+    authz.write_relationships([("document", document_ref("engineering", "doc_editable"), "editor", "user", "bob")])
 
     # Bob overwrites as editor
     res = client.post(
@@ -214,7 +237,7 @@ def test_ingest_editor_overwrite_allowed(client):
     assert res.status_code == 200
 
     # Owner must still be Alice
-    assert authz.get_document_owner("doc_editable") == "alice"
+    assert authz.get_document_owner(document_ref("engineering", "doc_editable")) == "alice"
 
 
 def test_ingest_owner_overwrite_allowed(client):
@@ -234,7 +257,7 @@ def test_ingest_owner_overwrite_allowed(client):
         json={"document_id": "doc_owner_repeat", "texts": ["Version 2"], "redact_pii": False},
     )
     assert res2.status_code == 200
-    assert get_authz_client().get_document_owner("doc_owner_repeat") == "alice"
+    assert get_authz_client().get_document_owner(document_ref("engineering", "doc_owner_repeat")) == "alice"
 
 
 def test_ingest_owner_transfer_allowed_only_by_owner(client):
@@ -247,7 +270,7 @@ def test_ingest_owner_transfer_allowed_only_by_owner(client):
         json={"document_id": "doc_transfer", "texts": ["Initial content"], "redact_pii": False},
     )
     authz = get_authz_client()
-    assert authz.get_document_owner("doc_transfer") == "alice"
+    assert authz.get_document_owner(document_ref("engineering", "doc_transfer")) == "alice"
 
     # Alice transfers to Carol
     res = client.post(
@@ -256,7 +279,7 @@ def test_ingest_owner_transfer_allowed_only_by_owner(client):
         json={"document_id": "doc_transfer", "texts": ["Transferred content"], "owner_id": "carol", "redact_pii": False},
     )
     assert res.status_code == 200
-    assert authz.get_document_owner("doc_transfer") == "carol"
+    assert authz.get_document_owner(document_ref("engineering", "doc_transfer")) == "carol"
 
 
 def test_ingest_editor_cannot_transfer_owner(client):
@@ -270,7 +293,7 @@ def test_ingest_editor_cannot_transfer_owner(client):
         json={"document_id": "doc_editor_preserve", "texts": ["Initial content"], "redact_pii": False},
     )
     authz = get_authz_client()
-    authz.write_relationships([("document", "doc_editor_preserve", "editor", "user", "bob")])
+    authz.write_relationships([("document", document_ref("engineering", "doc_editor_preserve"), "editor", "user", "bob")])
 
     res = client.post(
         "/ingest",
@@ -279,7 +302,7 @@ def test_ingest_editor_cannot_transfer_owner(client):
     )
     assert res.status_code == 200
     # Owner remains Alice, NOT transferred to Bob
-    assert authz.get_document_owner("doc_editor_preserve") == "alice"
+    assert authz.get_document_owner(document_ref("engineering", "doc_editor_preserve")) == "alice"
 
 
 def test_ingest_new_doc_allowed_for_tenant_member(client):
@@ -291,7 +314,7 @@ def test_ingest_new_doc_allowed_for_tenant_member(client):
         json={"document_id": "dave_new_doc", "texts": ["Dave content"], "redact_pii": False},
     )
     assert res.status_code == 200
-    assert get_authz_client().get_document_owner("dave_new_doc") == "dave"
+    assert get_authz_client().get_document_owner(document_ref("engineering", "dave_new_doc")) == "dave"
 
 
 def test_ingest_cross_tenant_forbidden_403(client):
@@ -309,6 +332,91 @@ def test_ingest_cross_tenant_forbidden_403(client):
     )
     assert res.status_code == 403
     assert "not a member of tenant 'engineering'" in res.json()["detail"]
+
+
+def test_ingest_ownerless_existing_doc_cannot_be_claimed(client):
+    """A document with no owner tuple still exists; a non-editor cannot re-create it as new."""
+    token_alice = create_token("alice", "engineering")
+    token_mallory = create_token("mallory", "engineering")
+    client.post(
+        "/ingest",
+        headers={"Authorization": f"Bearer {token_alice}"},
+        json={"document_id": "doc_ownerless", "texts": ["Original CANARY_OWNERLESS"], "viewers": ["bob"], "redact_pii": False},
+    )
+    authz = get_authz_client()
+    doc = document_ref("engineering", "doc_ownerless")
+    authz.delete_tuples([("document", doc, "owner", "user", "alice")])
+
+    res = client.post(
+        "/ingest",
+        headers={"Authorization": f"Bearer {token_mallory}"},
+        json={"document_id": "doc_ownerless", "texts": ["Mallory content"], "redact_pii": False},
+    )
+    assert res.status_code == 403
+    assert authz.get_document_owner(doc) is None
+
+
+def test_ingest_authz_lookup_failure_fails_closed(client, monkeypatch):
+    """If SpiceDB cannot answer whether the doc exists, ingest must not proceed as a new document."""
+    from secure_rag.authz.client import AuthorizationError
+    from secure_rag.retrieval.qdrant_store import get_vector_store
+
+    authz = get_authz_client()
+
+    def broken(*args, **kwargs):
+        raise AuthorizationError("authorization lookup failed")
+
+    monkeypatch.setattr(authz, "document_exists", broken)
+    token = create_token("mallory", "engineering")
+    res = client.post(
+        "/ingest",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"document_id": "doc_lookup_down", "texts": ["Mallory content"], "redact_pii": False},
+    )
+    assert res.status_code == 503
+    assert get_vector_store().count("engineering", "doc_lookup_down") == 0
+
+
+def test_real_client_owner_lookup_error_is_not_treated_as_missing():
+    from unittest.mock import MagicMock
+
+    from secure_rag.authz.client import AuthorizationError, RealSpiceDBClient
+
+    real = RealSpiceDBClient.__new__(RealSpiceDBClient)
+    real.client = MagicMock()
+    real.client.LookupSubjects.side_effect = RuntimeError("spicedb down")
+    real.client.ReadRelationships.side_effect = RuntimeError("spicedb down")
+    with pytest.raises(AuthorizationError):
+        real.get_document_owner("engineering/doc")
+    with pytest.raises(AuthorizationError):
+        real.document_exists("engineering/doc")
+
+
+def test_failed_owner_transfer_keeps_original_owner(client, monkeypatch):
+    from secure_rag.retrieval.qdrant_store import get_vector_store
+
+    token_alice = create_token("alice", "engineering")
+    client.post(
+        "/ingest",
+        headers={"Authorization": f"Bearer {token_alice}"},
+        json={"document_id": "doc_transfer_fail", "texts": ["v1"], "redact_pii": False},
+    )
+    store = get_vector_store()
+
+    def broken_upsert(points):
+        raise RuntimeError("qdrant down")
+
+    monkeypatch.setattr(store, "upsert", broken_upsert)
+    res = client.post(
+        "/ingest",
+        headers={"Authorization": f"Bearer {token_alice}"},
+        json={"document_id": "doc_transfer_fail", "texts": ["v2"], "owner_id": "carol", "redact_pii": False},
+    )
+    assert res.status_code == 503
+    authz = get_authz_client()
+    doc = document_ref("engineering", "doc_transfer_fail")
+    assert authz.get_document_owner(doc) == "alice"
+    assert not authz.check_permission("document", doc, "edit", "user", "carol")
 
 
 def test_policy_changed_endpoint(client):

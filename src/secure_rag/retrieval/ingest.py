@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 
 from secure_rag.audit.events import emit
-from secure_rag.authz.client import AuthorizationError, get_authz_client
+from secure_rag.authz.client import AuthorizationError, OverwriteDeniedError, chunk_ref, document_ref, get_authz_client
 from secure_rag.retrieval.embeddings import get_embedder
 from secure_rag.retrieval.pii import anonymize_text, chunk_text
 from secure_rag.retrieval.qdrant_store import get_vector_store
@@ -43,11 +43,14 @@ def ingest_texts(
     embedder = get_embedder(settings)
 
     effective_caller = caller_id or owner_id
-    existing_owner = authz.get_document_owner(document_id)
-    is_existing = existing_owner is not None
+    doc_ref = document_ref(tenant_id, document_id)
+    # Existence is any relationship on the document, not just an owner tuple, so an
+    # ownerless document can never be re-claimed as "new".
+    is_existing = authz.document_exists(doc_ref)
+    existing_owner = authz.get_document_owner(doc_ref) if is_existing else None
 
     if is_existing:
-        if not authz.check_permission("document", document_id, "edit", "user", effective_caller):
+        if not authz.check_permission("document", doc_ref, "edit", "user", effective_caller):
             emit(
                 "document.overwrite_attempt.denied",
                 user_id=effective_caller,
@@ -55,22 +58,14 @@ def ingest_texts(
                 tenant_id=tenant_id,
                 extra={"reason": "caller is not owner/editor"},
             )
-            raise AuthorizationError(f"Cannot overwrite document '{document_id}': caller is not owner/editor.")
-        if effective_caller == existing_owner:
-            effective_owner = owner_id
-            if effective_owner != existing_owner:
-                authz.delete_tuples([("document", document_id, "owner", "user", existing_owner)])
-                emit(
-                    "document.owner_reassigned",
-                    user_id=effective_caller,
-                    document_id=document_id,
-                    tenant_id=tenant_id,
-                    extra={"old_owner": existing_owner, "new_owner": effective_owner},
-                )
+            raise OverwriteDeniedError(f"Cannot overwrite document '{document_id}': caller is not owner/editor.")
+        if existing_owner is not None and effective_caller == existing_owner:
+            effective_owner: str | None = owner_id
         else:
             effective_owner = existing_owner
     else:
         effective_owner = owner_id
+    owner_reassigned = existing_owner is not None and effective_owner != existing_owner
 
     chunks: list[str] = []
     for text in texts:
@@ -82,15 +77,13 @@ def ingest_texts(
     provenance = hashlib.sha256("\n".join(chunks).encode("utf-8")).hexdigest()
     vectors = embedder.embed(chunks, task="retrieval_document")
     points = []
-    tuples = [
-        ("document", document_id, "owner", "user", effective_owner),
-        ("document", document_id, "tenant", "tenant", tenant_id),
-        ("tenant", tenant_id, "member", "user", effective_owner),
-    ]
+    tuples = [("document", doc_ref, "tenant", "tenant", tenant_id)]
+    if effective_owner:
+        tuples.insert(0, ("document", doc_ref, "owner", "user", effective_owner))
     for viewer in viewers:
         if viewer == effective_owner:
             continue
-        tuples.append(("document", document_id, "viewer", "user", viewer))
+        tuples.append(("document", doc_ref, "viewer", "user", viewer))
     tuples = list(dict.fromkeys(tuples))
 
     try:
@@ -98,7 +91,7 @@ def ingest_texts(
         chunk_tuples = []
         for idx, (chunk, vector) in enumerate(zip(chunks, vectors)):
             chunk_id = f"{document_id}__{idx}"
-            chunk_tuples.append(("chunk", chunk_id, "parent_document", "document", document_id))
+            chunk_tuples.append(("chunk", chunk_ref(tenant_id, chunk_id), "parent_document", "document", doc_ref))
             points.append(
                 {
                     "id": _stable_uuid(f"{tenant_id}__{chunk_id}"),
@@ -118,19 +111,33 @@ def ingest_texts(
         authz.write_relationships(chunk_tuples)
         store.delete_document(tenant_id, document_id)
         store.upsert(points)
+        if owner_reassigned:
+            # Drop the old owner only after the new owner tuple is written, so a
+            # failure never leaves the document ownerless.
+            authz.delete_tuples([("document", doc_ref, "owner", "user", existing_owner)])
     except Exception as exc:
         logger.exception("ingest failed; rolling back searchable vectors")
         store.delete_document(tenant_id, document_id)
         try:
             if not is_existing:
-                authz.delete_relationships("document", document_id)
+                authz.delete_relationships("document", doc_ref)
+            elif owner_reassigned:
+                authz.delete_tuples([("document", doc_ref, "owner", "user", effective_owner)])
         except Exception:
             logger.exception("SpiceDB rollback failed")
         raise AuthorizationError("ingestion aborted to avoid unauthorized searchable state") from exc
 
+    if owner_reassigned:
+        emit(
+            "document.owner_reassigned",
+            user_id=effective_caller,
+            document_id=document_id,
+            tenant_id=tenant_id,
+            extra={"old_owner": existing_owner, "new_owner": effective_owner},
+        )
     emit(
         "document.ingested",
-        user_id=effective_owner,
+        user_id=effective_owner or effective_caller,
         document_id=document_id,
         tenant_id=tenant_id,
         extra={"chunk_count": len(chunks), "provenance": provenance, "caller_id": effective_caller},

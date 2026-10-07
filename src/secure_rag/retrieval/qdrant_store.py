@@ -29,7 +29,9 @@ class VectorStore(Protocol):
         limit: int,
         allowed_document_ids: list[str] | None = None,
         tenant_id: str | None = None,
+        allowed_by_tenant: dict[str, list[str]] | None = None,
     ) -> list[RetrievedChunk]: ...
+    def get_chunk(self, tenant_id: str, chunk_id: str) -> RetrievedChunk | None: ...
     def list_documents(self, allowed_document_ids: list[str] | None = None) -> list[str]: ...
     def count(self, tenant_id: str | None = None, document_id: str | None = None) -> int: ...
 
@@ -88,8 +90,13 @@ class QdrantStore:
             ),
         )
 
-    def _filter(self, allowed_document_ids: list[str] | None, tenant_id: str | None) -> qmodels.Filter | None:
-        must: list[qmodels.FieldCondition] = []
+    def _filter(
+        self,
+        allowed_document_ids: list[str] | None,
+        tenant_id: str | None,
+        allowed_by_tenant: dict[str, list[str]] | None = None,
+    ) -> qmodels.Filter | None:
+        must: list[qmodels.FieldCondition | qmodels.Filter] = []
         if tenant_id:
             must.append(qmodels.FieldCondition(key="tenant_id", match=qmodels.MatchValue(value=tenant_id)))
         if allowed_document_ids is not None:
@@ -97,6 +104,23 @@ class QdrantStore:
                 must.append(qmodels.FieldCondition(key="document_id", match=qmodels.MatchValue(value="__none__")))
             else:
                 must.append(qmodels.FieldCondition(key="document_id", match=qmodels.MatchAny(any=allowed_document_ids)))
+        if allowed_by_tenant is not None:
+            # Each grant is a (tenant_id, document_id) pair: the same document_id in
+            # another tenant is a different document and must not match.
+            should = [
+                qmodels.Filter(
+                    must=[
+                        qmodels.FieldCondition(key="tenant_id", match=qmodels.MatchValue(value=t_id)),
+                        qmodels.FieldCondition(key="document_id", match=qmodels.MatchAny(any=doc_ids)),
+                    ]
+                )
+                for t_id, doc_ids in sorted(allowed_by_tenant.items())
+                if doc_ids
+            ]
+            if not should:
+                must.append(qmodels.FieldCondition(key="document_id", match=qmodels.MatchValue(value="__none__")))
+            else:
+                must.append(qmodels.Filter(should=should))
         return qmodels.Filter(must=must) if must else None
 
     def search(
@@ -105,8 +129,9 @@ class QdrantStore:
         limit: int,
         allowed_document_ids: list[str] | None = None,
         tenant_id: str | None = None,
+        allowed_by_tenant: dict[str, list[str]] | None = None,
     ) -> list[RetrievedChunk]:
-        query_filter = self._filter(allowed_document_ids, tenant_id)
+        query_filter = self._filter(allowed_document_ids, tenant_id, allowed_by_tenant)
         response = self.client.query_points(
             collection_name=self.collection,
             query=vector,
@@ -115,21 +140,36 @@ class QdrantStore:
             with_payload=True,
         )
         hits = getattr(response, "points", response)
-        chunks: list[RetrievedChunk] = []
-        for hit in hits:
-            payload = dict(hit.payload or {})
-            chunks.append(
-                RetrievedChunk(
-                    chunk_id=str(payload.get("chunk_id", hit.id)),
-                    document_id=str(payload.get("document_id", "")),
-                    tenant_id=str(payload.get("tenant_id", "")),
-                    text=str(payload.get("text", "")),
-                    score=float(hit.score or 0.0),
-                    payload=payload,
-                    taint=str(payload.get("taint", "untrusted")),
-                )
-            )
-        return chunks
+        return [self._to_chunk(hit.id, hit.payload, float(hit.score or 0.0)) for hit in hits]
+
+    def get_chunk(self, tenant_id: str, chunk_id: str) -> RetrievedChunk | None:
+        records, _ = self.client.scroll(
+            collection_name=self.collection,
+            scroll_filter=qmodels.Filter(
+                must=[
+                    qmodels.FieldCondition(key="tenant_id", match=qmodels.MatchValue(value=tenant_id)),
+                    qmodels.FieldCondition(key="chunk_id", match=qmodels.MatchValue(value=chunk_id)),
+                ]
+            ),
+            limit=1,
+            with_payload=True,
+        )
+        if not records:
+            return None
+        return self._to_chunk(records[0].id, records[0].payload, 0.0)
+
+    @staticmethod
+    def _to_chunk(point_id: Any, raw_payload: dict[str, Any] | None, score: float) -> RetrievedChunk:
+        payload = dict(raw_payload or {})
+        return RetrievedChunk(
+            chunk_id=str(payload.get("chunk_id", point_id)),
+            document_id=str(payload.get("document_id", "")),
+            tenant_id=str(payload.get("tenant_id", "")),
+            text=str(payload.get("text", "")),
+            score=score,
+            payload=payload,
+            taint=str(payload.get("taint", "untrusted")),
+        )
 
     def list_documents(self, allowed_document_ids: list[str] | None = None) -> list[str]:
         ids: set[str] = set()

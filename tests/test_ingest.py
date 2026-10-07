@@ -138,3 +138,27 @@ def test_same_doc_id_multi_tenant_ingest_roundtrip():
     # Assert healthcare_beta's document survives
     assert store.count("startup_alpha", "shared_name_doc") == 0
     assert store.count("healthcare_beta", "shared_name_doc") == 1
+
+
+def test_same_doc_id_across_tenants_has_separate_acls():
+    """A doc id reused in another tenant is a different SpiceDB object: no shared owner, no shared view."""
+    from secure_rag.agent.graph import retrieve_authorized
+    from secure_rag.authz.client import document_ref, get_authz_client
+
+    reset_vector_store()
+    reset_authz_client()
+    ingest_texts("shared_name_doc", ["Alpha CANARY_ALPHA"], owner_id="alice", tenant_id="startup_alpha", redact_pii=False)
+    ingest_texts("shared_name_doc", ["Beta CANARY_BETA"], owner_id="bob", tenant_id="healthcare_beta", redact_pii=False)
+    authz = get_authz_client()
+
+    assert authz.get_document_owner(document_ref("startup_alpha", "shared_name_doc")) == "alice"
+    assert authz.get_document_owner(document_ref("healthcare_beta", "shared_name_doc")) == "bob"
+    assert not authz.check_permission("document", document_ref("startup_alpha", "shared_name_doc"), "edit", "user", "bob")
+
+    # Without a tenant scope, pre-filtering must still match (tenant, document) pairs.
+    for mode in ("pre", "post"):
+        chunks, _ = retrieve_authorized("CANARY_BETA", "alice", n_results=5, filtering_mode=mode, tenant_id=None)
+        texts = " ".join(c.text for c in chunks)
+        assert "CANARY_BETA" not in texts
+        if mode == "pre":
+            assert "CANARY_ALPHA" in texts
