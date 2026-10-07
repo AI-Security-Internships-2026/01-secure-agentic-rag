@@ -11,8 +11,8 @@ from typing import Any
 from secure_rag.agent.graph import query_rag_system
 from secure_rag.agent.guardrails import heuristic_is_indirect_injection
 from secure_rag.agent.tools import execute_tool
-from secure_rag.authz.client import get_authz_client, reset_authz_client
-from secure_rag.benchmark.adapters import _poison, write_fixture
+from secure_rag.authz.client import document_ref, get_authz_client, reset_authz_client
+from secure_rag.benchmark.adapters import STALE_GRANTS, _poison, write_fixture
 from secure_rag.benchmark.datasets import fixture_path
 from secure_rag.benchmark.scoring import dump_jsonl, mcnemar_test, score_case, summarize
 from secure_rag.retrieval.ingest import ingest_texts
@@ -266,8 +266,8 @@ def _ingest_corpus(payload: dict, poison_id: str, family: str) -> None:
         if doc["document_id"] == poison_id and family not in {"stale_acl", "cross_turn", "same_tenant_bait"}:
             text = _poison(text, family)
         viewers = list(doc.get("viewers") or [doc["owner"]])
-        if family == "stale_acl" and doc["document_id"] in {"legal-hold", "eng-malware-04", "eng-secrets-06"}:
-            viewers = list(set(viewers + ["bob", "alice"]))
+        if family == "stale_acl":
+            viewers += [user for user, granted in STALE_GRANTS if granted == doc["document_id"]]
         ingest_texts(
             doc["document_id"],
             [text],
@@ -276,15 +276,13 @@ def _ingest_corpus(payload: dict, poison_id: str, family: str) -> None:
             viewers=viewers,
             redact_pii=False,
         )
-    if family == "stale_acl":
-        get_authz_client().delete_tuples(
-            [
-                ("document", "legal-hold", "viewer", "user", "bob"),
-                ("tenant", "legal", "member", "user", "bob"),
-                ("document", "eng-malware-04", "viewer", "user", "alice"),
-                ("document", "eng-secrets-06", "viewer", "user", "bob"),
-            ]
-        )
+
+
+def _revoke_stale_grants() -> None:
+    """Revoke the extra grants stale_acl cases were ingested with (owners keep access)."""
+    get_authz_client().delete_tuples(
+        [("document", document_ref("engineering", doc), "viewer", "user", user) for user, doc in STALE_GRANTS]
+    )
 
 
 def run_case(case: dict, cfg: dict, payload: dict, generator: str = "extractive", model_id: str = "llama-3.3-70b-versatile") -> dict:
@@ -299,7 +297,19 @@ def run_case(case: dict, cfg: dict, payload: dict, generator: str = "extractive"
     if generator == "llm":
         get_settings().llm_model = model_id
     started = time.perf_counter()
-    if family == "cross_turn":
+    if family == "stale_acl":
+        # Turn 1 runs while the grant is live; the grant is revoked before turn 2 reuses its context.
+        first = query_rag_system(**kwargs)
+        _revoke_stale_grants()
+        result = query_rag_system(
+            **kwargs,
+            prior_contexts=first.get("contexts") or [],
+            prior_retrieved=first.get("retrieved") or [],
+        )
+        result.setdefault("diagnostics", {})["stale_first_retrieved"] = [
+            item.get("document_id") for item in first.get("retrieved") or []
+        ]
+    elif family == "cross_turn":
         first = query_rag_system(**{**kwargs, "query": CROSS_TURN_PROBE})
         result = query_rag_system(
             **kwargs,
