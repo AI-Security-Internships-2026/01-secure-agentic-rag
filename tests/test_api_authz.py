@@ -334,6 +334,91 @@ def test_ingest_cross_tenant_forbidden_403(client):
     assert "not a member of tenant 'engineering'" in res.json()["detail"]
 
 
+def test_ingest_ownerless_existing_doc_cannot_be_claimed(client):
+    """A document with no owner tuple still exists; a non-editor cannot re-create it as new."""
+    token_alice = create_token("alice", "engineering")
+    token_mallory = create_token("mallory", "engineering")
+    client.post(
+        "/ingest",
+        headers={"Authorization": f"Bearer {token_alice}"},
+        json={"document_id": "doc_ownerless", "texts": ["Original CANARY_OWNERLESS"], "viewers": ["bob"], "redact_pii": False},
+    )
+    authz = get_authz_client()
+    doc = document_ref("engineering", "doc_ownerless")
+    authz.delete_tuples([("document", doc, "owner", "user", "alice")])
+
+    res = client.post(
+        "/ingest",
+        headers={"Authorization": f"Bearer {token_mallory}"},
+        json={"document_id": "doc_ownerless", "texts": ["Mallory content"], "redact_pii": False},
+    )
+    assert res.status_code == 403
+    assert authz.get_document_owner(doc) is None
+
+
+def test_ingest_authz_lookup_failure_fails_closed(client, monkeypatch):
+    """If SpiceDB cannot answer whether the doc exists, ingest must not proceed as a new document."""
+    from secure_rag.authz.client import AuthorizationError
+    from secure_rag.retrieval.qdrant_store import get_vector_store
+
+    authz = get_authz_client()
+
+    def broken(*args, **kwargs):
+        raise AuthorizationError("authorization lookup failed")
+
+    monkeypatch.setattr(authz, "document_exists", broken)
+    token = create_token("mallory", "engineering")
+    res = client.post(
+        "/ingest",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"document_id": "doc_lookup_down", "texts": ["Mallory content"], "redact_pii": False},
+    )
+    assert res.status_code == 503
+    assert get_vector_store().count("engineering", "doc_lookup_down") == 0
+
+
+def test_real_client_owner_lookup_error_is_not_treated_as_missing():
+    from unittest.mock import MagicMock
+
+    from secure_rag.authz.client import AuthorizationError, RealSpiceDBClient
+
+    real = RealSpiceDBClient.__new__(RealSpiceDBClient)
+    real.client = MagicMock()
+    real.client.LookupSubjects.side_effect = RuntimeError("spicedb down")
+    real.client.ReadRelationships.side_effect = RuntimeError("spicedb down")
+    with pytest.raises(AuthorizationError):
+        real.get_document_owner("engineering/doc")
+    with pytest.raises(AuthorizationError):
+        real.document_exists("engineering/doc")
+
+
+def test_failed_owner_transfer_keeps_original_owner(client, monkeypatch):
+    from secure_rag.retrieval.qdrant_store import get_vector_store
+
+    token_alice = create_token("alice", "engineering")
+    client.post(
+        "/ingest",
+        headers={"Authorization": f"Bearer {token_alice}"},
+        json={"document_id": "doc_transfer_fail", "texts": ["v1"], "redact_pii": False},
+    )
+    store = get_vector_store()
+
+    def broken_upsert(points):
+        raise RuntimeError("qdrant down")
+
+    monkeypatch.setattr(store, "upsert", broken_upsert)
+    res = client.post(
+        "/ingest",
+        headers={"Authorization": f"Bearer {token_alice}"},
+        json={"document_id": "doc_transfer_fail", "texts": ["v2"], "owner_id": "carol", "redact_pii": False},
+    )
+    assert res.status_code == 503
+    authz = get_authz_client()
+    doc = document_ref("engineering", "doc_transfer_fail")
+    assert authz.get_document_owner(doc) == "alice"
+    assert not authz.check_permission("document", doc, "edit", "user", "carol")
+
+
 def test_policy_changed_endpoint(client):
     """Webhook /authz/policy_changed increments policy version."""
     from secure_rag.agent.graph import get_policy_version

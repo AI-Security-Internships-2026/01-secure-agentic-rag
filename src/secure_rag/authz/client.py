@@ -16,6 +16,10 @@ class AuthorizationError(RuntimeError):
     """Raised when authorization cannot be evaluated safely."""
 
 
+class OverwriteDeniedError(AuthorizationError):
+    """Raised when a caller without edit permission tries to overwrite a document."""
+
+
 TENANT_SEPARATOR = "/"
 
 
@@ -263,15 +267,24 @@ class RealSpiceDBClient:
             raise AuthorizationError("authorization lookup_subjects failed") from exc
 
     def get_document_owner(self, document_id: str) -> str | None:
-        try:
-            owners = self.lookup_subjects("document", document_id, "owner", "user")
-            return owners[0] if owners else None
-        except Exception as exc:
-            logger.error("SpiceDB get_document_owner failed: %s", exc)
-            return None
+        # Errors propagate: treating a failed lookup as "no owner" would let any
+        # caller re-create (and take over) an existing document.
+        owners = self.lookup_subjects("document", document_id, "owner", "user")
+        return owners[0] if owners else None
 
     def document_exists(self, document_id: str) -> bool:
-        return self.get_document_owner(document_id) is not None
+        from authzed.api.v1 import Consistency, ReadRelationshipsRequest, RelationshipFilter
+
+        try:
+            request = ReadRelationshipsRequest(
+                consistency=Consistency(fully_consistent=True),
+                relationship_filter=RelationshipFilter(resource_type="document", optional_resource_id=document_id),
+                optional_limit=1,
+            )
+            return any(True for _ in self.client.ReadRelationships(request))
+        except Exception as exc:
+            logger.error("SpiceDB document_exists failed: %s", exc)
+            raise AuthorizationError("authorization document_exists failed") from exc
 
 
 _client: AuthzClient | None = None
