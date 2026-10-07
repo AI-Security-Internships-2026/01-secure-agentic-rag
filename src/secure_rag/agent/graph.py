@@ -80,6 +80,12 @@ class AgentState(TypedDict, total=False):
     tool_results: list[dict[str, Any]]
 
 
+TOOL_INSTRUCTIONS = (
+    "You can call these tools: send_email(to_address: str, body: str) and safe_file_read(path: str). "
+    "To call one, write exactly <<<TOOL_CALL: tool_name(arg=\"value\")>>> on its own line. "
+    "Only call a tool if the user asked for that action.\n\n"
+)
+
 NAIVE_GENERATOR_PROMPT = (
     "You are a helpful assistant. Answer the user's question using the retrieved context.\n\n"
     "Retrieved context:\n{context_text}\n\nUser Question: {query}"
@@ -421,12 +427,12 @@ def call_tools_node(state: AgentState) -> dict:
     diagnostics = dict(state.get("diagnostics", {}))
     user_id = state.get("user_id", "")
     tenant_id = state.get("tenant_id", "")
-    contexts = list(state.get("contexts", []))
-    query = state.get("anonymized_query", "")
+    answer = str(state.get("answer", ""))
     enforce_authz = state.get("enable_action_authz", settings.enable_action_authz)
 
-    search_text = "\n".join(contexts + [query])
-    tool_calls = parse_tool_calls(search_text, user_id=user_id, tenant_id=tenant_id)
+    # Only calls the generator itself emitted are dispatched; retrieved text is never parsed for actions.
+    tool_calls = parse_tool_calls(answer, user_id=user_id, tenant_id=tenant_id)
+    diagnostics["tool_call_source"] = "generator_output"
 
     tool_results: list[dict[str, Any]] = []
     if tool_calls:
@@ -460,7 +466,13 @@ def call_tools_node(state: AgentState) -> dict:
         diagnostics["tool_denied"] = any_denied
         diagnostics["tool_results"] = tool_results
 
+    if tool_results:
+        allowed_outputs = [tr["output"] for tr in tool_results if tr.get("allowed")]
+        denied_outputs = [tr["output"] for tr in tool_results if not tr.get("allowed")]
+        answer = f"{answer} {' '.join(allowed_outputs or denied_outputs)}".strip()
+
     return {
+        "answer": answer,
         "tool_calls": tool_calls,
         "tool_results": tool_results,
         "diagnostics": diagnostics,
@@ -470,7 +482,6 @@ def call_tools_node(state: AgentState) -> dict:
 def generate_answer(state: AgentState) -> dict:
     settings = get_settings()
     contexts = state.get("contexts", [])
-    tool_results = state.get("tool_results", [])
     if not contexts:
         if state.get("diagnostics", {}).get("indirect_injection_detected"):
             return {"answer": BLOCKED_INJECTION_MESSAGE}
@@ -479,26 +490,12 @@ def generate_answer(state: AgentState) -> dict:
     isolate = bool(state.get("enable_context_isolation", True))
     use_llm = state.get("generator") == "llm" or (state.get("generator") != "extractive" and settings.app_env != "test")
     if not use_llm:
-        ans = extractive_generate(marked if not isolate else contexts, isolate=isolate)
-        if tool_results:
-            allowed_outputs = [tr["output"] for tr in tool_results if tr.get("allowed")]
-            denied_outputs = [tr["output"] for tr in tool_results if not tr.get("allowed")]
-            if allowed_outputs:
-                ans = f"{ans} {' '.join(allowed_outputs)}".strip()
-            elif denied_outputs:
-                ans = f"{ans} {' '.join(denied_outputs)}".strip()
-        return {"answer": ans}
+        return {"answer": extractive_generate(marked if not isolate else contexts, isolate=isolate)}
     context_text = "\n\n".join(f"--- Chunk {i+1} ---\n{c}" for i, c in enumerate(marked))
     template = ISOLATED_GENERATOR_PROMPT if isolate else NAIVE_GENERATOR_PROMPT
     budget = _budget(state)
-    answer = invoke_text(template.format(context_text=context_text, query=state["anonymized_query"]), budget=budget)
-    if tool_results:
-        allowed_outputs = [tr["output"] for tr in tool_results if tr.get("allowed")]
-        denied_outputs = [tr["output"] for tr in tool_results if not tr.get("allowed")]
-        if allowed_outputs:
-            answer = f"{answer} {' '.join(allowed_outputs)}".strip()
-        elif denied_outputs:
-            answer = f"{answer} {' '.join(denied_outputs)}".strip()
+    prompt = TOOL_INSTRUCTIONS + template.format(context_text=context_text, query=state["anonymized_query"])
+    answer = invoke_text(prompt, budget=budget)
     return {"answer": answer, "llm_calls": budget.used}
 
 
@@ -523,7 +520,7 @@ def guard_output(state: AgentState) -> dict:
 
 def route_after_verification(state: AgentState) -> str:
     if state.get("contexts"):
-        return "call_tools"
+        return "generate"
     if state.get("loop_step", 0) < state.get("max_steps", 2):
         return "rewrite_query"
     return "generate"
@@ -544,11 +541,11 @@ def build_graph():
     workflow.add_conditional_edges(
         "verify_and_rerank",
         route_after_verification,
-        {"call_tools": "call_tools", "rewrite_query": "rewrite_query", "generate": "generate"},
+        {"rewrite_query": "rewrite_query", "generate": "generate"},
     )
-    workflow.add_edge("call_tools", "generate")
     workflow.add_edge("rewrite_query", "retrieve")
-    workflow.add_edge("generate", "guard_output")
+    workflow.add_edge("generate", "call_tools")
+    workflow.add_edge("call_tools", "guard_output")
     workflow.add_edge("guard_output", END)
     return workflow.compile()
 
