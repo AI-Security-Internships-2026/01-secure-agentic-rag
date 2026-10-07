@@ -83,6 +83,12 @@ jobs:
       - name: Pytest
         run: python -m pytest -v --junitxml=pytest-report.xml
 
+      # Every committed table, figure and checksum must re-derive from the committed scored rows.
+      - name: Results drift check
+        run: |
+          sha256sum -c experiments/results/SHA256SUMS
+          python generate_results.py --check
+
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
