@@ -68,6 +68,7 @@ class AgentState(TypedDict, total=False):
     enable_datamarking: bool
     enable_llm_injection_scan: bool
     enable_action_authz: bool
+    enable_continuous_auth: bool
     enable_agent_loop: bool
     prior_contexts: list[str]
     prior_retrieved: list[dict[str, Any]]
@@ -183,6 +184,80 @@ def guard_input(state: AgentState) -> dict:
     return {"anonymized_query": anonymized, "llm_calls": budget.used}
 
 
+def _revalidate_prior(
+    prior_contexts: list[str],
+    prior_retrieved: list[dict[str, Any]],
+    user_id: str,
+    default_tenant_id: str,
+    settings: Settings,
+) -> tuple[list[str], list[dict[str, Any]], int]:
+    """Re-authorize every prior-turn chunk against current policy.
+
+    Text is reloaded from the vector store by (tenant_id, chunk_id) instead of being
+    taken from prior_contexts: that list is positional and is reordered/filtered by the
+    guard and reranker, so pairing it with prior_retrieved would bind the wrong text to
+    an authorized document.
+    """
+    authz = get_authz_client(settings)
+    store = get_vector_store(settings)
+    kept_contexts: list[str] = []
+    kept_retrieved: list[dict[str, Any]] = []
+    dropped = 0
+
+    def drop(document_id: str, tenant_id: str, chunk_id: str, reason: str) -> None:
+        nonlocal dropped
+        dropped += 1
+        emit(
+            "context.revalidated.drop",
+            user_id=user_id,
+            document_id=document_id or "unknown",
+            tenant_id=tenant_id,
+            extra={"chunk_id": chunk_id, "reason": reason},
+        )
+
+    for _ in range(max(0, len(prior_contexts) - len(prior_retrieved))):
+        drop("", default_tenant_id, "", "missing_provenance")
+
+    for meta in prior_retrieved:
+        chunk_id = str(meta.get("chunk_id") or "")
+        tenant_id = str(meta.get("tenant_id") or default_tenant_id or "")
+        if not chunk_id or not tenant_id:
+            drop(str(meta.get("document_id") or ""), tenant_id, chunk_id, "missing_provenance")
+            continue
+        stored = store.get_chunk(tenant_id, chunk_id)
+        if stored is None:
+            drop(str(meta.get("document_id") or ""), tenant_id, chunk_id, "chunk_not_found")
+            continue
+        try:
+            allowed = authz.check_permission(
+                "document", document_ref(stored.tenant_id, stored.document_id), "view", "user", user_id
+            )
+        except AuthorizationError:
+            allowed = False
+        if not allowed:
+            drop(stored.document_id, stored.tenant_id, chunk_id, "permission_revoked")
+            continue
+        kept_contexts.append(stored.text)
+        kept_retrieved.append(
+            {
+                "chunk_id": stored.chunk_id,
+                "document_id": stored.document_id,
+                "tenant_id": stored.tenant_id,
+                "score": meta.get("score", 0.0),
+                "taint": stored.taint,
+                "retrieved_at_policy_version": meta.get("retrieved_at_policy_version", get_policy_version()),
+            }
+        )
+        emit(
+            "context.revalidated.pass",
+            user_id=user_id,
+            document_id=stored.document_id,
+            tenant_id=stored.tenant_id,
+            extra={"chunk_id": chunk_id},
+        )
+    return kept_contexts, kept_retrieved, dropped
+
+
 def retrieve_node(state: AgentState) -> dict:
     settings = get_settings()
     user_id = state["user_id"]
@@ -216,68 +291,31 @@ def retrieve_node(state: AgentState) -> dict:
     prior_contexts = list(state.get("prior_contexts") or [])
     prior_retrieved = list(state.get("prior_retrieved") or [])
 
-    revalidated_contexts: list[str] = []
-    revalidated_retrieved: list[dict[str, Any]] = []
-    stale_dropped = 0
-    revalidated_passed = 0
-
-    authz = get_authz_client(settings)
-    n_prior = max(len(prior_contexts), len(prior_retrieved))
-
-    for i in range(n_prior):
-        meta = prior_retrieved[i] if i < len(prior_retrieved) else {}
-        ctx_text = prior_contexts[i] if i < len(prior_contexts) else str(meta.get("text", ""))
-        doc_id = meta.get("document_id") or meta.get("doc_id", "")
-        chunk_id = meta.get("chunk_id", "")
-        t_id = meta.get("tenant_id") or state.get("tenant_id", "")
-
-        if not doc_id:
-            # Chunks lacking document provenance cannot be verified against ACLs -> drop safely
-            stale_dropped += 1
+    if not state.get("enable_continuous_auth", True):
+        # Vulnerable research baseline: prior turns are trusted as-is.
+        if prior_contexts:
             emit(
-                "context.revalidated.drop",
+                "context.reused.unvalidated",
                 user_id=user_id,
-                document_id="unknown",
-                tenant_id=t_id,
-                extra={"reason": "missing_provenance"},
+                document_id="",
+                tenant_id=state.get("tenant_id", ""),
+                extra={"prior_chunks": len(prior_contexts)},
             )
-            continue
+        merged["cross_turn_prior_chunks"] = len(prior_contexts)
+        merged["stale_chunks_dropped_this_turn"] = 0
+        merged["prior_chunks_revalidated_pass"] = 0
+        return {
+            "contexts": prior_contexts + contexts,
+            "retrieved": prior_retrieved + retrieved,
+            "diagnostics": merged,
+        }
 
-        # Check current SpiceDB authorization
-        is_allowed = bool(t_id) and authz.check_permission("document", document_ref(t_id, doc_id), "view", "user", user_id)
-        if is_allowed:
-            revalidated_contexts.append(ctx_text)
-            revalidated_retrieved.append(
-                {
-                    "chunk_id": chunk_id or f"{doc_id}__prior",
-                    "document_id": doc_id,
-                    "tenant_id": t_id,
-                    "score": meta.get("score", 0.0),
-                    "taint": meta.get("taint", "untrusted"),
-                    "retrieved_at_policy_version": meta.get("retrieved_at_policy_version", current_policy_ver),
-                }
-            )
-            revalidated_passed += 1
-            emit(
-                "context.revalidated.pass",
-                user_id=user_id,
-                document_id=doc_id,
-                tenant_id=t_id,
-                extra={"chunk_id": chunk_id},
-            )
-        else:
-            stale_dropped += 1
-            emit(
-                "context.revalidated.drop",
-                user_id=user_id,
-                document_id=doc_id,
-                tenant_id=t_id,
-                extra={"chunk_id": chunk_id, "reason": "permission_revoked"},
-            )
-
+    revalidated_contexts, revalidated_retrieved, stale_dropped = _revalidate_prior(
+        prior_contexts, prior_retrieved, user_id, state.get("tenant_id", ""), settings
+    )
     merged["cross_turn_prior_chunks"] = len(revalidated_contexts)
     merged["stale_chunks_dropped_this_turn"] = stale_dropped
-    merged["prior_chunks_revalidated_pass"] = revalidated_passed
+    merged["prior_chunks_revalidated_pass"] = len(revalidated_contexts)
 
     if revalidated_contexts:
         contexts = revalidated_contexts + contexts
@@ -514,6 +552,7 @@ def query_rag_system(
     enable_llm_injection_scan: bool | None = None,
     enable_agent_loop: bool = True,
     enable_action_authz: bool | None = None,
+    enable_continuous_auth: bool = True,
     generator: str = "auto",
     prior_contexts: list[str] | None = None,
     prior_retrieved: list[dict[str, Any]] | None = None,
@@ -543,6 +582,7 @@ def query_rag_system(
         "enable_datamarking": settings.enable_datamarking if enable_datamarking is None else enable_datamarking,
         "enable_llm_injection_scan": settings.enable_llm_injection_scan if enable_llm_injection_scan is None else enable_llm_injection_scan,
         "enable_action_authz": settings.enable_action_authz if enable_action_authz is None else enable_action_authz,
+        "enable_continuous_auth": enable_continuous_auth,
         "enable_agent_loop": enable_agent_loop,
         "prior_contexts": prior_contexts or [],
         "prior_retrieved": prior_retrieved or [],

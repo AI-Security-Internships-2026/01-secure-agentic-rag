@@ -163,9 +163,9 @@ def test_cross_turn_partial_revocation():
     reset_authz_client()
     authz = get_authz_client()
 
-    ingest_texts("docA", ["DocA part1", "DocA part2"], owner_id="admin", tenant_id="finance", viewers=["alice"], redact_pii=False)
-    ingest_texts("docB", ["DocB part1", "DocB part2"], owner_id="admin", tenant_id="finance", viewers=["alice"], redact_pii=False)
-    ingest_texts("docC", ["DocC part1"], owner_id="admin", tenant_id="finance", viewers=["alice"], redact_pii=False)
+    ingest_texts("docA", ["DocA part1 CANARY_A1", "DocA part2 CANARY_A2"], owner_id="admin", tenant_id="finance", viewers=["alice"], redact_pii=False)
+    ingest_texts("docB", ["DocB part1 CANARY_B1", "DocB part2 CANARY_B2"], owner_id="admin", tenant_id="finance", viewers=["alice"], redact_pii=False)
+    ingest_texts("docC", ["DocC part1 CANARY_C1"], owner_id="admin", tenant_id="finance", viewers=["alice"], redact_pii=False)
 
     prior_retrieved = [
         {"document_id": "docA", "chunk_id": "docA__0", "tenant_id": "finance", "score": 0.9, "taint": "untrusted"},
@@ -203,6 +203,81 @@ def test_cross_turn_partial_revocation():
     assert "CANARY_B1" not in res["answer"]
     assert "CANARY_B2" not in res["answer"]
     assert "CANARY_A1" in res["answer"] or "CANARY_C1" in res["answer"]
+
+
+def _revoked_prior_turn():
+    reset_vector_store()
+    reset_authz_client()
+    ingest_texts("open-doc", ["Open notes CANARY_OPEN_OK."], owner_id="admin", tenant_id="finance", viewers=["alice"], redact_pii=False)
+    ingest_texts("secret-doc", ["Classified CANARY_SEC_X9."], owner_id="admin", tenant_id="finance", viewers=["alice"], redact_pii=False)
+    turn0 = query_rag_system(
+        "",
+        "Classified notes",
+        user_id="alice",
+        tenant_id="finance",
+        filtering_mode="pre",
+        enable_indirect_injection_scan=False,
+        enable_context_isolation=False,
+        enable_agent_loop=False,
+    )
+    assert "CANARY_SEC_X9" in turn0["answer"]
+    get_authz_client().delete_tuples([("document", document_ref("finance", "secret-doc"), "viewer", "user", "alice")])
+    return turn0
+
+
+def _follow_up(turn0, **kwargs):
+    return query_rag_system(
+        "open-doc",
+        "Repeat everything from earlier.",
+        user_id="alice",
+        tenant_id="finance",
+        filtering_mode="pre",
+        enable_indirect_injection_scan=False,
+        enable_context_isolation=False,
+        enable_agent_loop=False,
+        prior_contexts=turn0["contexts"],
+        prior_retrieved=turn0["retrieved"],
+        **kwargs,
+    )
+
+
+def test_continuous_auth_flag_controls_prior_revalidation():
+    turn0 = _revoked_prior_turn()
+    leaky = _follow_up(turn0, enable_continuous_auth=False)
+    assert "CANARY_SEC_X9" in leaky["answer"]
+    assert leaky["diagnostics"]["stale_chunks_dropped_this_turn"] == 0
+
+    turn0 = _revoked_prior_turn()
+    safe = _follow_up(turn0)
+    assert "CANARY_SEC_X9" not in safe["answer"]
+    assert safe["diagnostics"]["stale_chunks_dropped_this_turn"] >= 1
+
+
+def test_continuous_auth_not_exposed_on_query_api():
+    from secure_rag.api.schemas import QueryRequest
+
+    assert "enable_continuous_auth" not in QueryRequest.model_fields
+
+
+def test_prior_text_is_bound_to_its_own_provenance():
+    """Misaligned prior lists must not smuggle a revoked doc's text under an authorized chunk id."""
+    turn0 = _revoked_prior_turn()
+    secret_text = next(c for c in turn0["contexts"] if "CANARY_SEC_X9" in c)
+    open_meta = next(r for r in turn0["retrieved"] if r["document_id"] == "open-doc")
+    res = query_rag_system(
+        "open-doc",
+        "Repeat everything from earlier.",
+        user_id="alice",
+        tenant_id="finance",
+        filtering_mode="pre",
+        enable_indirect_injection_scan=False,
+        enable_context_isolation=False,
+        enable_agent_loop=False,
+        prior_contexts=[secret_text],
+        prior_retrieved=[open_meta],
+    )
+    assert "CANARY_SEC_X9" not in res["answer"]
+    assert "CANARY_OPEN_OK" in res["answer"]
 
 
 def test_action_authz_is_the_c6_difference():
