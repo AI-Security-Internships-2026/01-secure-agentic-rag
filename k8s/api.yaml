@@ -21,6 +21,7 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
+        runAsGroup: 10001
         fsGroup: 10001
       containers:
         - name: api
@@ -31,6 +32,13 @@ spec:
           env:
             - name: APP_ENV
               value: production
+            # Audit lines go to stdout as "[AUDIT] {json}" for the cluster log collector.
+            # Set to "file" to write AUDIT_LOG_PATH on the audit-logs volume instead; the
+            # root filesystem stays read-only either way.
+            - name: AUDIT_OUTPUT_DESTINATION
+              value: stdout
+            - name: AUDIT_LOG_PATH
+              value: /app/logs/audit.jsonl
             - name: SPICEDB_ENDPOINT
               value: spicedb:50051
             - name: QDRANT_URL
@@ -45,6 +53,11 @@ spec:
                 secretKeyRef:
                   name: authinject-secrets
                   key: spicedb-preshared-key
+            - name: AUDIT_HMAC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: authinject-secrets
+                  key: audit-hmac-secret
           resources:
             requests:
               cpu: 250m

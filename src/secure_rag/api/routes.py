@@ -49,6 +49,20 @@ def ready():
 def query(body: QueryRequest, principal: Principal = Depends(get_principal)):
     settings = get_settings()
     if settings.app_env == "production" and settings.production_enforce_pre_auth:
+        if body.filtering_mode in ("post", "research_baseline_none"):
+
+            emit(
+                "authz.permission.denied",
+                user_id=principal.user_id,
+                document_id=body.document_id or "",
+                tenant_id=principal.tenant_id,
+                extra={
+                    "resource": f"filtering_mode:{body.filtering_mode}",
+                    "permission": "query",
+                    "denied_at_step": "query",
+                    "reason": "filtering mode disabled in production profile",
+                },
+            )
         if body.filtering_mode == "post":
             raise HTTPException(
                 status_code=403,
@@ -99,6 +113,18 @@ def ingest(body: IngestRequest, principal: Principal = Depends(get_principal)):
                     document_id=body.document_id,
                     tenant_id=target_tenant_id,
                     extra={"reason": "caller is not a member of target tenant"},
+                )
+                emit(
+                    "authz.permission.denied",
+                    user_id=principal.user_id,
+                    document_id=body.document_id,
+                    tenant_id=target_tenant_id,
+                    extra={
+                        "resource": f"document:{doc_ref}",
+                        "permission": "create",
+                        "denied_at_step": "ingest",
+                        "reason": "caller is not a member of target tenant",
+                    },
                 )
                 raise HTTPException(
                     status_code=403,

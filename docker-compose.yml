@@ -72,6 +72,11 @@ services:
       APP_ENV: ${APP_ENV:-development}
       SPICEDB_ENDPOINT: spicedb:50051
       QDRANT_URL: http://qdrant:6333
+      AUDIT_OUTPUT_DESTINATION: ${AUDIT_OUTPUT_DESTINATION:-stdout}
+      AUDIT_LOG_PATH: /app/logs/audit.jsonl
+    # File mode writes to the bind mount, which must be writable by uid 10001:
+    #   mkdir -p .data/logs && sudo chown 10001:10001 .data/logs
+    # Otherwise the API refuses to start (fail-closed audit sink check).
     volumes:
       - ./.data/logs:/app/logs
     depends_on:

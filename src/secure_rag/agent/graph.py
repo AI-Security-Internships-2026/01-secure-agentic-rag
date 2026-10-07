@@ -177,6 +177,17 @@ def guard_input(state: AgentState) -> dict:
             ),
             {"SAFE", "MALICIOUS"},
         )
+        if label == "MALICIOUS" or (label is None and settings.llm_fail_closed):
+            emit(
+                "guardrail.input_failed",
+                user_id=state.get("user_id", ""),
+                document_id=state.get("collection_name", "") or "",
+                tenant_id=state.get("tenant_id", "") or "",
+                extra={
+                    "guardrail_name": "llm_input_classifier",
+                    "reject_reason": "malicious" if label == "MALICIOUS" else "invalid_label_fail_closed",
+                },
+            )
         if label == "MALICIOUS":
             raise ValueError("Security Alert: Prompt injection or malicious instruction detected.")
         if label is None and settings.llm_fail_closed:
@@ -204,7 +215,9 @@ def _revalidate_prior(
     kept_retrieved: list[dict[str, Any]] = []
     dropped = 0
 
-    def drop(document_id: str, tenant_id: str, chunk_id: str, reason: str) -> None:
+    current_policy_version = get_policy_version()
+
+    def drop(document_id: str, tenant_id: str, chunk_id: str, reason: str, old_version: int | None = None) -> None:
         nonlocal dropped
         dropped += 1
         emit(
@@ -212,21 +225,27 @@ def _revalidate_prior(
             user_id=user_id,
             document_id=document_id or "unknown",
             tenant_id=tenant_id,
-            extra={"chunk_id": chunk_id, "reason": reason},
+            extra={
+                "chunk_ref": chunk_id or "unknown",
+                "old_policy_version": old_version,
+                "current_policy_version": current_policy_version,
+                "reason": reason,
+            },
         )
 
     for _ in range(max(0, len(prior_contexts) - len(prior_retrieved))):
         drop("", default_tenant_id, "", "missing_provenance")
 
     for meta in prior_retrieved:
+        old_version = meta.get("retrieved_at_policy_version")
         chunk_id = str(meta.get("chunk_id") or "")
         tenant_id = str(meta.get("tenant_id") or default_tenant_id or "")
         if not chunk_id or not tenant_id:
-            drop(str(meta.get("document_id") or ""), tenant_id, chunk_id, "missing_provenance")
+            drop(str(meta.get("document_id") or ""), tenant_id, chunk_id, "missing_provenance", old_version)
             continue
         stored = store.get_chunk(tenant_id, chunk_id)
         if stored is None:
-            drop(str(meta.get("document_id") or ""), tenant_id, chunk_id, "chunk_not_found")
+            drop(str(meta.get("document_id") or ""), tenant_id, chunk_id, "chunk_not_found", old_version)
             continue
         try:
             allowed = authz.check_permission(
@@ -235,7 +254,7 @@ def _revalidate_prior(
         except AuthorizationError:
             allowed = False
         if not allowed:
-            drop(stored.document_id, stored.tenant_id, chunk_id, "permission_revoked")
+            drop(stored.document_id, stored.tenant_id, chunk_id, "permission_revoked", old_version)
             continue
         kept_contexts.append(stored.text)
         kept_retrieved.append(
@@ -253,7 +272,7 @@ def _revalidate_prior(
             user_id=user_id,
             document_id=stored.document_id,
             tenant_id=stored.tenant_id,
-            extra={"chunk_id": chunk_id},
+            extra={"chunk_ref": chunk_id, "policy_version": current_policy_version},
         )
     return kept_contexts, kept_retrieved, dropped
 
@@ -341,6 +360,11 @@ def verify_and_rerank(state: AgentState) -> dict:
             and settings.app_env != "test",
             budget=budget,
             settings=settings,
+            audit={
+                "user_id": state.get("user_id", ""),
+                "tenant_id": state.get("tenant_id", "") or "",
+                "chunk_ids": [item.get("chunk_id", "") for item in state.get("retrieved", [])],
+            },
         )
         prior = bool(diagnostics.get("indirect_injection_detected"))
         diagnostics.update(scan_diag)

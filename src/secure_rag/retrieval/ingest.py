@@ -6,7 +6,7 @@ import re
 import uuid
 from pathlib import Path
 
-from secure_rag.audit.events import emit
+from secure_rag.audit.events import emit, format_tuple
 from secure_rag.authz.client import AuthorizationError, OverwriteDeniedError, chunk_ref, document_ref, get_authz_client
 from secure_rag.retrieval.embeddings import get_embedder
 from secure_rag.retrieval.pii import anonymize_text, chunk_text
@@ -58,6 +58,18 @@ def ingest_texts(
                 tenant_id=tenant_id,
                 extra={"reason": "caller is not owner/editor"},
             )
+            emit(
+                "authz.permission.denied",
+                user_id=effective_caller,
+                document_id=document_id,
+                tenant_id=tenant_id,
+                extra={
+                    "resource": f"document:{doc_ref}",
+                    "permission": "edit",
+                    "denied_at_step": "ingest",
+                    "reason": "caller is not owner/editor",
+                },
+            )
             raise OverwriteDeniedError(f"Cannot overwrite document '{document_id}': caller is not owner/editor.")
         if existing_owner is not None and effective_caller == existing_owner:
             effective_owner: str | None = owner_id
@@ -88,6 +100,13 @@ def ingest_texts(
 
     try:
         authz.write_relationships(tuples)
+        emit(
+            "authz.spicedb_tuple.write",
+            user_id=effective_caller,
+            document_id=document_id,
+            tenant_id=tenant_id,
+            extra={"tuples": [format_tuple(t) for t in tuples], "writer_principal": effective_caller},
+        )
         chunk_tuples = []
         for idx, (chunk, vector) in enumerate(zip(chunks, vectors)):
             chunk_id = f"{document_id}__{idx}"
@@ -109,18 +128,55 @@ def ingest_texts(
                 }
             )
         authz.write_relationships(chunk_tuples)
+        emit(
+            "authz.spicedb_tuple.write",
+            user_id=effective_caller,
+            document_id=document_id,
+            tenant_id=tenant_id,
+            extra={"tuples": [format_tuple(t) for t in chunk_tuples], "writer_principal": effective_caller},
+        )
         store.delete_document(tenant_id, document_id)
         store.upsert(points)
         if owner_reassigned:
             # Drop the old owner only after the new owner tuple is written, so a
             # failure never leaves the document ownerless.
-            authz.delete_tuples([("document", doc_ref, "owner", "user", existing_owner)])
+            old_owner_tuple = ("document", doc_ref, "owner", "user", existing_owner)
+            authz.delete_tuples([old_owner_tuple])
+            emit(
+                "authz.spicedb_tuple.delete",
+                user_id=effective_caller,
+                document_id=document_id,
+                tenant_id=tenant_id,
+                extra={
+                    "tuples": [format_tuple(old_owner_tuple)],
+                    "deleter_principal": effective_caller,
+                    "reason_code": "owner_reassigned",
+                },
+            )
+            emit(
+                "document.owner_reassigned",
+                user_id=effective_caller,
+                document_id=document_id,
+                tenant_id=tenant_id,
+                extra={"old_owner": existing_owner, "new_owner": effective_owner},
+            )
     except Exception as exc:
         logger.exception("ingest failed; rolling back searchable vectors")
         store.delete_document(tenant_id, document_id)
         try:
             if not is_existing:
                 authz.delete_relationships("document", doc_ref)
+                emit(
+                    "authz.spicedb_tuple.delete",
+                    user_id=effective_caller,
+                    document_id=document_id,
+                    tenant_id=tenant_id,
+                    extra={
+                        "tuples": [f"document:{doc_ref}#*@*", f"chunk:*#parent_document@document:{doc_ref}"],
+                        "deleter_principal": effective_caller,
+                        "reason_code": "ingest_rollback",
+                    },
+                )
             elif owner_reassigned:
                 authz.delete_tuples([("document", doc_ref, "owner", "user", effective_owner)])
         except Exception:
