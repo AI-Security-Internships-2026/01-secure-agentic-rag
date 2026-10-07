@@ -23,6 +23,7 @@ from secure_rag.retrieval.qdrant_store import RetrievedChunk, get_vector_store
 from secure_rag.settings import Settings, get_settings
 
 FilteringMode = Literal["none", "pre", "post", "research_baseline_none"]
+FILTERING_MODES = frozenset({"none", "pre", "post", "research_baseline_none"})
 
 
 @dataclass
@@ -105,6 +106,9 @@ def retrieve_authorized(
     tenant_id: str | None = None,
     settings: Settings | None = None,
 ) -> tuple[list[RetrievedChunk], dict[str, Any]]:
+    if filtering_mode not in FILTERING_MODES:
+        # Unknown modes would otherwise fall through to an ungated search.
+        raise AuthorizationError(f"unsupported filtering_mode: {filtering_mode!r}")
     settings = settings or get_settings()
     store = get_vector_store(settings)
     embedder = get_embedder(settings)

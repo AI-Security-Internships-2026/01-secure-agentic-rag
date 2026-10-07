@@ -135,16 +135,39 @@ def test_internal_baseline_none_works_via_direct_call():
     assert "eng-runbook" in retrieved_docs
 
 
+def test_unknown_filtering_mode_fails_closed_on_direct_call():
+    reset_vector_store()
+    reset_authz_client()
+    ingest_texts("eng-runbook", ["secret CANARY_ENG_B2"], owner_id="bob", tenant_id="engineering", redact_pii=False)
+    from secure_rag.agent.graph import query_rag_system
+
+    result = query_rag_system(
+        collection_name="",
+        query="secret CANARY_ENG_B2",
+        user_id="alice",
+        tenant_id="engineering",
+        filtering_mode="banana",
+        enable_indirect_injection_scan=False,
+    )
+    assert result["retrieved"] == []
+    assert "CANARY_ENG_B2" not in result["answer"]
+
+
 def test_pre_mode_works_in_production(monkeypatch):
     reset_vector_store()
     reset_authz_client()
+    # Production refuses the in-memory SpiceDB simulator (fail closed), so seed it
+    # under APP_ENV=test and keep the cached client when switching profiles.
+    ingest_texts("finance-policy", ["secret CANARY_FIN_A1"], owner_id="alice", tenant_id="finance", redact_pii=False)
+    ingest_texts("eng-runbook", ["secret CANARY_ENG_B2"], owner_id="bob", tenant_id="engineering", redact_pii=False)
+    # Production routes every agent step through the LLM; stub it out.
+    monkeypatch.setattr("secure_rag.agent.graph.invoke_text", lambda *args, **kwargs: "SAFE")
+    monkeypatch.setattr("secure_rag.agent.llm.invoke_text", lambda *args, **kwargs: "SAFE")
     monkeypatch.setenv("APP_ENV", "production")
     from secure_rag.settings import reset_settings
 
     reset_settings()
     try:
-        ingest_texts("finance-policy", ["secret CANARY_FIN_A1"], owner_id="alice", tenant_id="finance", redact_pii=False)
-        ingest_texts("eng-runbook", ["secret CANARY_ENG_B2"], owner_id="bob", tenant_id="engineering", redact_pii=False)
         client = TestClient(create_app())
         token = create_token("alice", "finance")
         response = client.post(
