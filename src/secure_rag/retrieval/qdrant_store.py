@@ -33,6 +33,7 @@ class VectorStore(Protocol):
     ) -> list[RetrievedChunk]: ...
     def get_chunk(self, tenant_id: str, chunk_id: str) -> RetrievedChunk | None: ...
     def list_documents(self, allowed_document_ids: list[str] | None = None) -> list[str]: ...
+    def list_chunks(self) -> list[RetrievedChunk]: ...
     def count(self, tenant_id: str | None = None, document_id: str | None = None) -> int: ...
 
 
@@ -181,6 +182,10 @@ class QdrantStore:
             if allowed_document_ids is None or doc_id in allowed_document_ids:
                 ids.add(doc_id)
         return sorted(ids)
+
+    def list_chunks(self) -> list[RetrievedChunk]:
+        records, _ = self.client.scroll(collection_name=self.collection, limit=10_000, with_payload=True)
+        return [self._to_chunk(rec.id, rec.payload, 0.0) for rec in records]
 
     def count(self, tenant_id: str | None = None, document_id: str | None = None) -> int:
         must: list[qmodels.FieldCondition] = []

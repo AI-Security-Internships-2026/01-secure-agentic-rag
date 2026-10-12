@@ -54,7 +54,7 @@ verify-audit-chain = "secure_rag.audit.verify:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-secure_rag = ["authz/schema.zed"]
+secure_rag = ["authz/schema.zed", "playground/static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -5,6 +5,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 PY=.venv/bin/python
 API_PORT="${API_PORT:-8080}"
+UI_PORT="${UI_PORT:-8501}"
 BASE="http://127.0.0.1:${API_PORT}"
 
 usage() {
@@ -18,7 +19,10 @@ AuthInject-RAG runner
   ./run.sh demo --list        list the 10 demo steps
   ./run.sh demo --steps 4,6   run only some steps
 
-  ./run.sh api                start the REST API offline on :8080 (docs at /docs)
+  ./run.sh ui                 browser playground on :8501: upload your own files, query live
+  ./run.sh ui --services      the playground against SpiceDB and Qdrant from docker compose
+
+  ./run.sh api               start the REST API offline on :8080 (docs at /docs)
   ./run.sh curl-demo          in a second terminal: the Alice and Bob story with curl
   ./run.sh cli                interactive menu (query, ingest PDF, list docs, change mode)
 
@@ -83,6 +87,23 @@ cmd_demo_services() {
   need_venv
   cmd_services
   "$PY" -m secure_rag.demo --mode services "$@"
+}
+
+cmd_ui() {
+  need_venv
+  export AUDIT_LOG_PATH=logs/playground-audit.jsonl
+  if [ "${1:-}" = "--services" ]; then
+    cmd_services
+    export APP_ENV=development EMBED_BACKEND=hash QDRANT_IN_MEMORY=false QDRANT_COLLECTION=authinject_playground
+    export ENABLE_LLM_INJECTION_SCAN=false OTEL_SDK_DISABLED=true AUDIT_OUTPUT_DESTINATION=file
+    echo "Playground against Docker services: documents stay until you press Reset."
+  else
+    offline_env
+    rm -f "$AUDIT_LOG_PATH"
+    echo "Offline playground: everything lives in this process and starts empty."
+  fi
+  echo "Open http://127.0.0.1:${UI_PORT}    Stop: Ctrl+C"
+  "$PY" -m uvicorn secure_rag.playground.app:app --host 127.0.0.1 --port "$UI_PORT"
 }
 
 cmd_api() {
@@ -223,6 +244,7 @@ case "$command" in
   check) cmd_check ;;
   demo) cmd_demo "$@" ;;
   demo-services) cmd_demo_services "$@" ;;
+  ui) cmd_ui "$@" ;;
   api) cmd_api "$@" ;;
   curl-demo) cmd_curl_demo ;;
   cli) cmd_cli "$@" ;;
