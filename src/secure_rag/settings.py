@@ -60,6 +60,8 @@ class Settings(BaseSettings):
 
     audit_output_destination: Literal["file", "stdout"] = "stdout"
     audit_log_path: str = "logs/audit.jsonl"
+    # HMAC key for the audit hash chain; >=32 chars is mandatory when app_env == "production".
+    audit_hmac_secret: str = ""
 
     @property
     def allow_simulator(self) -> bool:

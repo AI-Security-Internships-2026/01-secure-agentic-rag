@@ -5,6 +5,7 @@ os.environ["EMBED_BACKEND"] = "hash"
 os.environ["QDRANT_IN_MEMORY"] = "true"
 os.environ["AUDIT_LOG_PATH"] = "logs/test-audit.jsonl"
 os.environ["JWT_SECRET"] = "test-secret-please-change"
+os.environ["AUDIT_HMAC_SECRET"] = "test-audit-hmac-secret-0123456789abcdef"
 
 from secure_rag.settings import reset_settings
 from secure_rag.authz.client import reset_authz_client

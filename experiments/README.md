@@ -1,39 +1,66 @@
-# Experiments & Evaluation Artifacts
+# Experiments
 
-## Source of Truth & Reproducibility Hierarchy
+## Source of truth
 
-To ensure scientific integrity and eliminate artifact drift, the benchmark results follow a strict source-of-truth hierarchy:
+Every number reported for the AuthInject v2 benchmark comes from one file of scored rows and is
+derived from it by a script. Nothing below is edited by hand.
 
-1. **Primary Raw Results**: `experiments/results/authinject_v2_live_{YYYY-MM-DD}.jsonl` (or `authinject_eval.jsonl`) — line-by-line record of each evaluation run with all 8 metrics, latency, and request identifiers.
-2. **Derived Summaries & Statistical Tests**: `experiments/results/authinject_eval.json` and `experiments/results/authinject_v2_analysis.json` — summarized rates, Wilson 95% confidence intervals, and paired McNemar test p-values.
-3. **Paper Tables & Figures**: Rebuilt deterministically from the above artifacts via `python generate_results.py`. No data files or figures are manually edited.
-4. **Integrity Manifest**: `experiments/results/AUTHENTICATE.txt` records SHA-256 checksums of all committed benchmark artifacts.
+1. `benchmarks/fixtures/authinject_cases.json`: the v2.0 fixture (160 cases), written by
+   `python -m secure_rag.benchmark.datasets --seed 42 --version 2.0 --size 160`. A test checks the
+   committed file is byte-for-byte what the generator produces.
+2. `results/authinject_v2_rows.jsonl`: one scored row per (config, case, repeat).
+3. Derived by `python generate_results.py` from (2):
+   - `results/authinject_v2_analysis.json`: per-config and per-family rates with Wilson 95% CIs, paired McNemar tests
+   - `results/authinject_v2_tables.md`: the tables to copy into the paper (Overleaf)
+   - `results/hypothesis-report.txt`: directional checks of the paper's claims; a FAIL is a finding, not an error
+   - `results/figures/combined_failure_by_config.svg`
+   - `results/SHA256SUMS`: checksums of the fixture, the rows and every derived file
 
-## Running Benchmark Evaluations
+CI runs `sha256sum -c experiments/results/SHA256SUMS` and `python generate_results.py --check`, which
+fails if any derived file no longer matches the committed rows.
 
-### 1. Deterministic Fixture Generation (v2.0, 160 cases)
+## Reproduce
+
 ```bash
 python -m secure_rag.benchmark.datasets --seed 42 --version 2.0 --size 160
+APP_ENV=test python generate_results.py --run      # offline: hash embeddings, extractive generator
+python generate_results.py --check
 ```
 
-### 2. Full Benchmark Matrix (11 Configs × 3 Models × 5 Repeats)
+The committed run is **offline**: hash embeddings and the extractive generator, which stands in for
+the model (naive mode echoes context, isolated mode drops instruction-like lines). It is deterministic,
+so it uses one repeat; more repeats would only change latency. `model_id` is recorded as `none`
+because no model is called, and the runner refuses a multi-model run with this generator.
+
+Live model run (uses `.env` `LLM_BASE_URL` / `LLM_API_KEY`; do not set `APP_ENV=test`):
+
 ```bash
-python -m secure_rag.benchmark.runner --repeats 5 --split all --generator extractive --out experiments/results/authinject_eval.json --jsonl_out experiments/results/authinject_v2_live_2026-09-21.jsonl
+python generate_results.py --run --generator llm --models <model-a> <model-b> --repeats 5 \
+  --jsonl experiments/results/authinject_v2_rows_live.jsonl
 ```
 
-### 3. Generate Paper Tables, Figures, and Gate Verification
+## What the offline run can and cannot show
+
+- **Stale ACL:** turn 1 retrieves a same-tenant document while a grant is live; the grant is revoked;
+  turn 2 reuses the prior context. B2 (pre-filter only) re-exposes it, P1 (continuous authorization)
+  drops it.
+- **Same-tenant bait:** compares B1 post-filter against B2 authorization-first retrieval.
+- **Cross-turn:** no permission changes between turns, so B2 and P1 behave identically (H1 FAIL is expected).
+- **Tool ASR:** tool calls are dispatched only when the generator's output contains one. Offline,
+  that means the naive extractive generator echoed an injected call. Model-chosen dispatch needs the live run.
+- **Ablations A1-A4:** they are indistinguishable from P2 offline, because the extractive generator plus
+  the scanner already stop every injection. Telling the components apart needs the live run.
+
+## Historical tracks (unchanged)
+
+| File | Meaning |
+|------|---------|
+| `results/authinject_eval.json`, `.jsonl` | Week 9-10 C0-C8 run (20 cases, offline) |
+| `results/authinject_tables.json` | Tables for that run, C0-C6 |
+| `results/indirect_injection_eval.json` | Week 8 direct-context run, 19 August (60% to 0% canary ASR) |
+| `results/guardrail_comparison.json` | InjecAgent scanner comparison, 80 cases (see `docs/guardrail-comparison.md`) |
+
 ```bash
-python generate_results.py --jsonl experiments/results/authinject_v2_live_2026-09-21.jsonl --out_analysis experiments/results/authinject_v2_analysis.json --gate_report experiments/results/gate-report.txt --figures_dir paper/figures
+python experiments/run_indirect_injection_eval.py
+python -m secure_rag.benchmark.guardrail_compare --out experiments/results/guardrail_comparison.json
 ```
-
-Output figures are written to `paper/figures/`:
-- `fig2_security_metrics_comparison.svg`
-- `fig3_precision_recall_f1.svg`
-- `fig4_latency_sequence_breakdown.svg`
-- `fig5_pareto_security_vs_latency.svg`
-- `fig6_violin_p95_concurrency.svg`
-- `fig7_cross_model_consistency.svg`
-
-## Historical Evaluations
-- `results/indirect_injection_eval.json`: Historical 19 August direct-context run (60% to 0% canary ASR).
-- `results/guardrail_comparison.json`: InjecAgent scanner comparison (see `docs/guardrail-comparison.md`).

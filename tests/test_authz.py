@@ -1,7 +1,7 @@
 import pytest
 
 from secure_rag.agent.graph import query_rag_system, retrieve_authorized
-from secure_rag.authz.client import get_authz_client, reset_authz_client
+from secure_rag.authz.client import chunk_ref, document_ref, get_authz_client, reset_authz_client
 from secure_rag.retrieval.ingest import ingest_texts
 from secure_rag.retrieval.qdrant_store import reset_vector_store
 
@@ -24,9 +24,9 @@ def setup_function():
 
 def test_simulator_permissions():
     authz = get_authz_client()
-    assert authz.check_permission("document", "test_spicedb_doc", "view", "user", "alice")
-    assert authz.check_permission("document", "test_spicedb_doc", "view", "user", "bob")
-    assert not authz.check_permission("document", "test_spicedb_doc", "view", "user", "eve")
+    assert authz.check_permission("document", document_ref("finance", "test_spicedb_doc"), "view", "user", "alice")
+    assert authz.check_permission("document", document_ref("finance", "test_spicedb_doc"), "view", "user", "bob")
+    assert not authz.check_permission("document", document_ref("finance", "test_spicedb_doc"), "view", "user", "eve")
 
 
 def test_prefilter_denies_unrelated_user():
@@ -70,7 +70,7 @@ def test_tenant_member_without_doc_grant_cannot_view(user, doc, expected):
         ]
     )
 
-    assert authz.check_permission("document", doc, "view", "user", user) is expected
+    assert authz.check_permission("document", document_ref("engineering", doc), "view", "user", user) is expected
 
 
 @pytest.mark.parametrize(
@@ -105,7 +105,7 @@ def test_doc_viewer_isolation_same_tenant(user, doc, expected):
         redact_pii=False,
     )
 
-    assert authz.check_permission("document", doc, "view", "user", user) is expected
+    assert authz.check_permission("document", document_ref("engineering", doc), "view", "user", user) is expected
 
 
 def test_owner_and_editor_grants():
@@ -117,26 +117,26 @@ def test_owner_and_editor_grants():
     ingest_texts("doc_rbac", ["RBAC content"], owner_id="owner_user", tenant_id="engineering", redact_pii=False)
     authz.write_relationships(
         [
-            ("document", "doc_rbac", "editor", "user", "editor_user"),
-            ("document", "doc_rbac", "viewer", "user", "viewer_user"),
+            ("document", document_ref("engineering", "doc_rbac"), "editor", "user", "editor_user"),
+            ("document", document_ref("engineering", "doc_rbac"), "viewer", "user", "viewer_user"),
         ]
     )
 
     # 1. Owner can view and edit
-    assert authz.check_permission("document", "doc_rbac", "view", "user", "owner_user") is True
-    assert authz.check_permission("document", "doc_rbac", "edit", "user", "owner_user") is True
+    assert authz.check_permission("document", document_ref("engineering", "doc_rbac"), "view", "user", "owner_user") is True
+    assert authz.check_permission("document", document_ref("engineering", "doc_rbac"), "edit", "user", "owner_user") is True
 
     # 2. Editor can view and edit
-    assert authz.check_permission("document", "doc_rbac", "view", "user", "editor_user") is True
-    assert authz.check_permission("document", "doc_rbac", "edit", "user", "editor_user") is True
+    assert authz.check_permission("document", document_ref("engineering", "doc_rbac"), "view", "user", "editor_user") is True
+    assert authz.check_permission("document", document_ref("engineering", "doc_rbac"), "edit", "user", "editor_user") is True
 
     # 3. Viewer can view but CANNOT edit
-    assert authz.check_permission("document", "doc_rbac", "view", "user", "viewer_user") is True
-    assert authz.check_permission("document", "doc_rbac", "edit", "user", "viewer_user") is False
+    assert authz.check_permission("document", document_ref("engineering", "doc_rbac"), "view", "user", "viewer_user") is True
+    assert authz.check_permission("document", document_ref("engineering", "doc_rbac"), "edit", "user", "viewer_user") is False
 
     # 4. Unrelated user cannot view or edit
-    assert authz.check_permission("document", "doc_rbac", "view", "user", "random_user") is False
-    assert authz.check_permission("document", "doc_rbac", "edit", "user", "random_user") is False
+    assert authz.check_permission("document", document_ref("engineering", "doc_rbac"), "view", "user", "random_user") is False
+    assert authz.check_permission("document", document_ref("engineering", "doc_rbac"), "edit", "user", "random_user") is False
 
 
 def test_cross_tenant_viewer_grants_disjoint():
@@ -150,16 +150,16 @@ def test_cross_tenant_viewer_grants_disjoint():
     ingest_texts("fin_doc_a", ["Finance Doc A"], owner_id="frank", tenant_id="finance", redact_pii=False)
 
     # External user from finance is granted viewer on eng_doc_a ONLY
-    authz.write_relationships([("document", "eng_doc_a", "viewer", "user", "frank")])
+    authz.write_relationships([("document", document_ref("engineering", "eng_doc_a"), "viewer", "user", "frank")])
 
     # 1. Frank can view eng_doc_a
-    assert authz.check_permission("document", "eng_doc_a", "view", "user", "frank") is True
+    assert authz.check_permission("document", document_ref("engineering", "eng_doc_a"), "view", "user", "frank") is True
     # 2. Frank CANNOT view eng_doc_b in engineering
-    assert authz.check_permission("document", "eng_doc_b", "view", "user", "frank") is False
+    assert authz.check_permission("document", document_ref("engineering", "eng_doc_b"), "view", "user", "frank") is False
     # 3. Frank is NOT tenant member of engineering
     assert authz.check_permission("tenant", "engineering", "view", "user", "frank") is False
     # 4. Alice CANNOT view fin_doc_a
-    assert authz.check_permission("document", "fin_doc_a", "view", "user", "alice") is False
+    assert authz.check_permission("document", document_ref("finance", "fin_doc_a"), "view", "user", "alice") is False
 
 
 # Complete 20-case explicit matrix
@@ -207,19 +207,19 @@ def test_permission_matrix_20_cases(user, user_tenant, doc, expected):
         [
             ("tenant", "engineering", "member", "user", "tenant_member_1"),
             ("tenant", "engineering", "member", "user", "tenant_member_2"),
-            ("document", "eng_doc_alpha", "viewer", "user", "viewer_alpha_only"),
-            ("document", "eng_doc_beta", "viewer", "user", "viewer_beta_only"),
-            ("document", "eng_doc_alpha", "editor", "user", "editor_alpha"),
-            ("document", "eng_doc_beta", "editor", "user", "editor_beta"),
+            ("document", document_ref("engineering", "eng_doc_alpha"), "viewer", "user", "viewer_alpha_only"),
+            ("document", document_ref("engineering", "eng_doc_beta"), "viewer", "user", "viewer_beta_only"),
+            ("document", document_ref("engineering", "eng_doc_alpha"), "editor", "user", "editor_alpha"),
+            ("document", document_ref("engineering", "eng_doc_beta"), "editor", "user", "editor_beta"),
             ("tenant", "marketing", "member", "user", "external_guest"),
-            ("document", "eng_doc_alpha", "viewer", "user", "external_guest"),
+            ("document", document_ref("engineering", "eng_doc_alpha"), "viewer", "user", "external_guest"),
             ("tenant", "marketing", "member", "user", "foreign_user"),
         ]
     )
 
-    assert authz.check_permission("document", doc, "view", "user", user) is expected
+    assert authz.check_permission("document", document_ref("engineering", doc), "view", "user", user) is expected
     # Verify chunk-level inheritance
-    assert authz.check_permission("chunk", f"{doc}__0", "view", "user", user) is expected
+    assert authz.check_permission("chunk", chunk_ref("engineering", f"{doc}__0"), "view", "user", user) is expected
 
 
 def test_cross_doc_query_isolation_integration():
@@ -259,3 +259,31 @@ def test_cross_doc_query_isolation_integration():
     assert "threat_intel_42" not in retrieved_docs
     assert "CANARY_MALWARE_42" not in result["answer"]
 
+
+
+def test_schema_document_view_has_no_tenant_arrow():
+    from importlib import resources
+
+    schema = resources.files("secure_rag.authz").joinpath("schema.zed").read_text(encoding="utf-8")
+    document_block = schema.split("definition document", 1)[1].split("definition", 1)[0]
+    assert "tenant->" not in document_block
+
+
+def test_ingest_does_not_grant_tenant_membership():
+    """Ingesting (or naming someone as owner/viewer) must never make them a tenant member."""
+    reset_vector_store()
+    reset_authz_client()
+    authz = get_authz_client()
+
+    ingest_texts(
+        "eng_doc_owned_by_outsider",
+        ["Engineering doc"],
+        owner_id="mallory",
+        tenant_id="engineering",
+        viewers=["guest"],
+        redact_pii=False,
+    )
+
+    assert authz.check_permission("tenant", "engineering", "view", "user", "mallory") is False
+    assert authz.check_permission("tenant", "engineering", "view", "user", "guest") is False
+    assert not [t for t in authz.relationships if t[0] == "tenant"]

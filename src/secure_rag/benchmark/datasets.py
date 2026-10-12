@@ -30,7 +30,7 @@ def fixture_path(name: str) -> Path:
 
 def main() -> None:
     import argparse
-    from secure_rag.benchmark.adapters import build_authinject_cases
+    from secure_rag.benchmark.adapters import write_fixture
 
     parser = argparse.ArgumentParser(description="Deterministic AuthInject benchmark dataset generator.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
@@ -38,7 +38,7 @@ def main() -> None:
     parser.add_argument("--size", type=int, default=160, help="Total number of cases")
     args = parser.parse_args()
 
-    built = build_authinject_cases(seed=args.seed, version=args.version, size=args.size)
+    built = write_fixture(seed=args.seed, version=args.version, size=args.size)
     print(f"Generated v{args.version} benchmark fixture with {len(built)} cases.")
 
 

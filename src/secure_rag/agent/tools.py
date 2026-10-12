@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from secure_rag.audit.events import emit
+from secure_rag.audit.events import args_hash, emit
 from secure_rag.authz.client import AuthorizationError, get_authz_client
 from secure_rag.settings import get_settings
 
@@ -133,6 +133,16 @@ def parse_tool_calls(
     return tool_calls
 
 
+def _permission_denied(name: str, user_id: str, tenant_id: str, reason: str) -> None:
+    emit(
+        "authz.permission.denied",
+        user_id=user_id,
+        document_id=name,
+        tenant_id=tenant_id,
+        extra={"resource": f"tool:{name}", "permission": "execute", "denied_at_step": "tool", "reason": reason},
+    )
+
+
 def execute_tool(
     name: str,
     user_id: str,
@@ -156,8 +166,9 @@ def execute_tool(
                 user_id=user_id,
                 document_id=name,
                 tenant_id=tenant_id,
-                extra={"tool": name, "arguments": arguments, "reason": "authz_error"},
+                extra={"action": name, "args_hash": args_hash(arguments), "deny_reason": "authz_error"},
             )
+            _permission_denied(name, user_id, tenant_id, "authz_error")
             return ToolResult(
                 name=name,
                 allowed=False,
@@ -170,8 +181,9 @@ def execute_tool(
                 user_id=user_id,
                 document_id=name,
                 tenant_id=tenant_id,
-                extra={"tool": name, "arguments": arguments, "reason": "unauthorized"},
+                extra={"action": name, "args_hash": args_hash(arguments), "deny_reason": "unauthorized"},
             )
+            _permission_denied(name, user_id, tenant_id, "unauthorized")
             return ToolResult(
                 name=name,
                 allowed=False,
@@ -184,7 +196,7 @@ def execute_tool(
         user_id=user_id,
         document_id=name,
         tenant_id=tenant_id,
-        extra={"tool": name, "arguments": arguments},
+        extra={"action": name, "args_hash": args_hash(arguments)},
     )
 
     if name == "lookup_secret":

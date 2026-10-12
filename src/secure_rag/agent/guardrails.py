@@ -45,10 +45,17 @@ class ScanResult:
     detected: bool
 
 
-def heuristic_is_indirect_injection(chunk: str) -> bool:
+def heuristic_match(chunk: str) -> str | None:
     if not chunk:
-        return False
-    return any(pattern.search(chunk) for pattern in INDIRECT_INJECTION_REGEXES)
+        return None
+    for pattern in INDIRECT_INJECTION_REGEXES:
+        if pattern.search(chunk):
+            return pattern.pattern
+    return None
+
+
+def heuristic_is_indirect_injection(chunk: str) -> bool:
+    return heuristic_match(chunk) is not None
 
 
 def llm_is_indirect_injection(chunk: str, budget: LLMBudget | None = None, settings: Settings | None = None) -> bool:
@@ -94,14 +101,18 @@ def filter_injected_chunks(
     use_llm: bool = False,
     budget: LLMBudget | None = None,
     settings: Settings | None = None,
+    audit: dict | None = None,
 ) -> tuple[list[str], dict]:
+    """Drop injected chunks. With ``audit`` (user_id, tenant_id, chunk_ids) each hit is audited."""
     kept: list[str] = []
     discarded = 0
     detected = False
-    for chunk in chunks or []:
+    for index, chunk in enumerate(chunks or []):
         if is_indirect_injection(chunk, use_heuristic=use_heuristic, use_llm=use_llm, budget=budget, settings=settings):
             discarded += 1
             detected = True
+            if audit is not None:
+                _audit_injection(chunk, index, audit, use_heuristic=use_heuristic)
         else:
             kept.append(chunk)
     return kept, {
@@ -109,6 +120,25 @@ def filter_injected_chunks(
         "discarded_injected_chunks_count": discarded,
         "kept_chunks_count": len(kept),
     }
+
+
+def _audit_injection(chunk: str, index: int, audit: dict, *, use_heuristic: bool) -> None:
+    from secure_rag.audit.events import emit
+
+    chunk_ids = audit.get("chunk_ids") or []
+    chunk_id = chunk_ids[index] if index < len(chunk_ids) and chunk_ids[index] else f"context[{index}]"
+    pattern = heuristic_match(chunk) if use_heuristic else None
+    emit(
+        "guardrail.injection_detected",
+        user_id=audit.get("user_id", ""),
+        tenant_id=audit.get("tenant_id", ""),
+        extra={
+            "chunk_id": chunk_id,
+            "detector_type": "regex" if pattern else "llm_classifier",
+            "score": 1.0,
+            "matched_pattern": pattern or "",
+        },
+    )
 
 
 def datamark(chunk: str) -> str:

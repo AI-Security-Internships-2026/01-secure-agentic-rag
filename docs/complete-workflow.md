@@ -469,14 +469,11 @@ A successful `/query` returns JSON to the caller. The durable copy is one line i
 
 ### 10.5 Audit log — `logs/audit.jsonl`
 
-Controlled by `AUDIT_LOG_PATH`. Default: `logs/audit.jsonl`.
+`AUDIT_OUTPUT_DESTINATION` picks the sink: `stdout` (default; lines prefixed `[AUDIT] `) or `file` (`AUDIT_LOG_PATH`, default `logs/audit.jsonl`).
 
-Each line is one JSON object, for example:
+Each line is one JSON object: time (`ts`, UTC), event name, `user_id`, `tenant_id`, `document_id`, event fields, and `chain_hash`. Operational events are `document.ingested` and `query.completed`. Security events (typed in `secure_rag/audit/schema.py`): `auth.token.minted`, `auth.token.failed`, `authz.permission.denied`, `authz.spicedb_tuple.write`, `authz.spicedb_tuple.delete`, `guardrail.injection_detected`, `guardrail.input_failed`, `context.revalidated.pass`, `context.revalidated.drop`, `tool.exec.allowed`, `tool.exec.denied`, `audit.rotation_event`.
 
-- `ingest.completed`
-- `query.completed`
-
-Typical fields: time (`ts`), event name, `user_id`, `tenant_id`, `document_id`, filtering mode, injection flag, retrieved chunk ids, `llm_calls`.
+`chain_hash = HMAC-SHA256(AUDIT_HMAC_SECRET, previous chain_hash || canonical JSON of the line)`. Each segment (new file, rotated file, new process on stdout) starts with an `audit.rotation_event` chained from `sha256("secure_rag_audit_v1" || secret)`. Check a log with `verify-audit-chain logs/audit.jsonl` (or `python -m secure_rag.audit.verify`); exit code 1 names the first altered, removed or reordered line. Production refuses to start without a secret of at least 32 characters.
 
 This file grows forever until you rotate or delete it. It is the operational history of the running app.
 

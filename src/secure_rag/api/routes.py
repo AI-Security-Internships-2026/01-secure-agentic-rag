@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from secure_rag.agent.graph import query_rag_system
 from secure_rag.api.auth import Principal, create_token, get_principal
 from secure_rag.api.schemas import IngestRequest, QueryRequest, TokenRequest
-from secure_rag.authz.client import AuthorizationError, get_authz_client
+from secure_rag.audit.events import emit
+from secure_rag.authz.client import AuthorizationError, OverwriteDeniedError, document_ref, get_authz_client, split_ref
 from secure_rag.retrieval.ingest import ingest_texts
 from secure_rag.retrieval.qdrant_store import get_vector_store
 from secure_rag.settings import get_settings
@@ -48,6 +49,20 @@ def ready():
 def query(body: QueryRequest, principal: Principal = Depends(get_principal)):
     settings = get_settings()
     if settings.app_env == "production" and settings.production_enforce_pre_auth:
+        if body.filtering_mode in ("post", "research_baseline_none"):
+
+            emit(
+                "authz.permission.denied",
+                user_id=principal.user_id,
+                document_id=body.document_id or "",
+                tenant_id=principal.tenant_id,
+                extra={
+                    "resource": f"filtering_mode:{body.filtering_mode}",
+                    "permission": "query",
+                    "denied_at_step": "query",
+                    "reason": "filtering mode disabled in production profile",
+                },
+            )
         if body.filtering_mode == "post":
             raise HTTPException(
                 status_code=403,
@@ -79,59 +94,56 @@ def ingest(body: IngestRequest, principal: Principal = Depends(get_principal)):
     target_tenant_id = body.tenant_id if body.tenant_id else principal.tenant_id
     requested_owner_id = body.owner_id if body.owner_id else principal.user_id
 
-    existing_owner = authz.get_document_owner(body.document_id)
-    if existing_owner is not None:
-        if not authz.check_permission("document", body.document_id, "edit", "user", principal.user_id):
-            from secure_rag.audit.events import emit
-
-            emit(
-                "document.overwrite_attempt.denied",
-                user_id=principal.user_id,
-                document_id=body.document_id,
-                tenant_id=target_tenant_id,
-                extra={"reason": "caller is not owner/editor"},
-            )
-            raise HTTPException(
-                status_code=403,
-                detail=f"Cannot overwrite document '{body.document_id}': caller is not owner/editor.",
-            )
-        if principal.user_id == existing_owner:
-            effective_owner = requested_owner_id
-        else:
-            effective_owner = existing_owner
-    else:
-        is_member = (principal.tenant_id == target_tenant_id) or authz.check_permission(
-            "tenant", target_tenant_id, "view", "user", principal.user_id
-        )
-        if not is_member:
-            from secure_rag.audit.events import emit
-
-            emit(
-                "document.overwrite_attempt.denied",
-                user_id=principal.user_id,
-                document_id=body.document_id,
-                tenant_id=target_tenant_id,
-                extra={"reason": "caller is not a member of target tenant"},
-            )
-            raise HTTPException(
-                status_code=403,
-                detail=f"Cannot create document: caller '{principal.user_id}' is not a member of tenant '{target_tenant_id}'.",
-            )
-        effective_owner = requested_owner_id
+    try:
+        doc_ref = document_ref(target_tenant_id, body.document_id)
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     try:
+        # Overwrites of existing documents are authorized inside ingest_texts (owner/editor);
+        # creating a new document additionally requires membership of the target tenant.
+        if not authz.document_exists(doc_ref):
+            is_member = principal.tenant_id == target_tenant_id or authz.check_permission(
+                "tenant", target_tenant_id, "view", "user", principal.user_id
+            )
+            if not is_member:
+                emit(
+                    "document.overwrite_attempt.denied",
+                    user_id=principal.user_id,
+                    document_id=body.document_id,
+                    tenant_id=target_tenant_id,
+                    extra={"reason": "caller is not a member of target tenant"},
+                )
+                emit(
+                    "authz.permission.denied",
+                    user_id=principal.user_id,
+                    document_id=body.document_id,
+                    tenant_id=target_tenant_id,
+                    extra={
+                        "resource": f"document:{doc_ref}",
+                        "permission": "create",
+                        "denied_at_step": "ingest",
+                        "reason": "caller is not a member of target tenant",
+                    },
+                )
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Cannot create document: caller '{principal.user_id}' is not a member of tenant '{target_tenant_id}'.",
+                )
         return ingest_texts(
             body.document_id,
             body.texts,
-            owner_id=effective_owner,
+            owner_id=requested_owner_id,
             tenant_id=target_tenant_id,
             viewers=body.viewers,
             redact_pii=body.redact_pii,
             caller_id=principal.user_id,
         )
+    except HTTPException:
+        raise
+    except OverwriteDeniedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except AuthorizationError as exc:
-        if "Cannot overwrite" in str(exc) or "not owner/editor" in str(exc):
-            raise HTTPException(status_code=403, detail=str(exc)) from exc
         raise HTTPException(status_code=503, detail=str(exc) or "authorization or dependency unavailable") from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -141,7 +153,8 @@ def ingest(body: IngestRequest, principal: Principal = Depends(get_principal)):
 
 @router.get("/permissions")
 def permissions(principal: Principal = Depends(get_principal)):
-    docs = get_authz_client().lookup_resources("document", "view", "user", principal.user_id)
+    refs = get_authz_client().lookup_resources("document", "view", "user", principal.user_id)
+    docs = [doc_id for tenant_id, doc_id in map(split_ref, refs) if tenant_id == principal.tenant_id]
     return {"user_id": principal.user_id, "tenant_id": principal.tenant_id, "documents": docs}
 
 

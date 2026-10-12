@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" font-family="Arial, sans-serif">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="480.0" y="22" font-size="15" text-anchor="middle">Combined failure rate by configuration (generated from scored rows)</text>
+  <line x1="70" y1="300" x2="940" y2="300" stroke="#9ca3af"/>
+  <line x1="70" y1="40" x2="70" y2="300" stroke="#9ca3af"/>
+  <text x="64" y="304.0" font-size="11" text-anchor="end">0%</text>
+  <text x="64" y="239.0" font-size="11" text-anchor="end">25%</text>
+  <text x="64" y="174.0" font-size="11" text-anchor="end">50%</text>
+  <text x="64" y="109.0" font-size="11" text-anchor="end">75%</text>
+  <text x="64" y="44.0" font-size="11" text-anchor="end">100%</text>
+  <rect x="81.9" y="40.0" width="55.4" height="260.0" fill="#3b82f6"/>
+  <text x="109.5" y="36.0" font-size="11" text-anchor="middle">100.0%</text>
+  <text x="109.5" y="314" font-size="11" text-anchor="end" transform="rotate(-40 109.5 314)">B0_ungated</text>
+  <rect x="161.0" y="116.4" width="55.4" height="183.6" fill="#3b82f6"/>
+  <text x="188.6" y="112.4" font-size="11" text-anchor="middle">70.6%</text>
+  <text x="188.6" y="314" font-size="11" text-anchor="end" transform="rotate(-40 188.6 314)">B1_postfilter</text>
+  <rect x="240.0" y="223.6" width="55.4" height="76.4" fill="#3b82f6"/>
+  <text x="267.7" y="219.6" font-size="11" text-anchor="middle">29.4%</text>
+  <text x="267.7" y="314" font-size="11" text-anchor="end" transform="rotate(-40 267.7 314)">B2_afr_only</text>
+  <rect x="319.1" y="267.5" width="55.4" height="32.5" fill="#3b82f6"/>
+  <text x="346.8" y="263.5" font-size="11" text-anchor="middle">12.5%</text>
+  <text x="346.8" y="314" font-size="11" text-anchor="end" transform="rotate(-40 346.8 314)">B3_afr_scan</text>
+  <rect x="398.2" y="256.1" width="55.4" height="43.9" fill="#3b82f6"/>
+  <text x="425.9" y="252.1" font-size="11" text-anchor="middle">16.9%</text>
+  <text x="425.9" y="314" font-size="11" text-anchor="end" transform="rotate(-40 425.9 314)">P1_continuous_auth</text>
+  <rect x="477.3" y="300.0" width="55.4" height="0.0" fill="#3b82f6"/>
+  <text x="505.0" y="296.0" font-size="11" text-anchor="middle">0.0%</text>
+  <text x="505.0" y="314" font-size="11" text-anchor="end" transform="rotate(-40 505.0 314)">P2_full_stack</text>
+  <rect x="556.4" y="300.0" width="55.4" height="0.0" fill="#3b82f6"/>
+  <text x="584.1" y="296.0" font-size="11" text-anchor="middle">0.0%</text>
+  <text x="584.1" y="314" font-size="11" text-anchor="end" transform="rotate(-40 584.1 314)">A1_no_datamarking</text>
+  <rect x="635.5" y="300.0" width="55.4" height="0.0" fill="#3b82f6"/>
+  <text x="663.2" y="296.0" font-size="11" text-anchor="middle">0.0%</text>
+  <text x="663.2" y="314" font-size="11" text-anchor="end" transform="rotate(-40 663.2 314)">A2_no_scanner</text>
+  <rect x="714.6" y="300.0" width="55.4" height="0.0" fill="#3b82f6"/>
+  <text x="742.3" y="296.0" font-size="11" text-anchor="middle">0.0%</text>
+  <text x="742.3" y="314" font-size="11" text-anchor="end" transform="rotate(-40 742.3 314)">A3_no_context_isolation</text>
+  <rect x="793.7" y="300.0" width="55.4" height="0.0" fill="#3b82f6"/>
+  <text x="821.4" y="296.0" font-size="11" text-anchor="middle">0.0%</text>
+  <text x="821.4" y="314" font-size="11" text-anchor="end" transform="rotate(-40 821.4 314)">A4_no_tool_authz</text>
+  <rect x="872.8" y="267.5" width="55.4" height="32.5" fill="#3b82f6"/>
+  <text x="900.5" y="263.5" font-size="11" text-anchor="middle">12.5%</text>
+  <text x="900.5" y="314" font-size="11" text-anchor="end" transform="rotate(-40 900.5 314)">A5_no_continuous_auth</text>
+</svg>

@@ -1,0 +1,8 @@
+AuthInject-RAG hypothesis checks (generated from scored rows, informational)
+Rows: 1760 | generator(s): extractive | model(s): none
+
+FAIL  H1 P1 reduces cross-turn exposure vs B2 (McNemar): b=0 c=0 p=1 (20 pairs)
+PASS  H2 P1 reduces stale-ACL exposure vs B2 (McNemar): b=20 c=0 p=2.15e-05 (20 pairs)
+PASS  H3 B2 reduces same-tenant bait exposure vs B1 (McNemar): b=40 c=0 p=7.01e-10 (40 pairs)
+PASS  H4 P2 tool ASR below B0: P2_full_stack=0.0% vs B0_ungated=75.0%
+PASS  H5 P2 combined failure below B0: P2_full_stack=0.0% vs B0_ungated=100.0%
