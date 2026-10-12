@@ -1,0 +1,71 @@
+\section{Related Work}
+\label{sec:related_work}
+
+Securing autonomous, multi-tenant agentic Retrieval-Augmented Generation (RAG) systems requires unifying four historically distinct domains: enterprise authorization engines, adversarial prompt injection defenses, capability-based tool access control, and stateful multi-turn memory revocation. We review prior work across these four axes and highlight the architectural gaps addressed by our continuous authorization framework.
+
+\subsection{Authorization and Access Control in Multi-Tenant RAG}
+\label{sec:rel_rag_authz}
+
+Enterprise multi-tenant information systems increasingly adopt Relationship-Based Access Control (ReBAC) architectures inspired by Google's Zanzibar~\cite{pang2019zanzibar}. Open-source operationalizations such as SpiceDB~\cite{authzed2023spicedb} and Open Policy Agent (OPA)~\cite{styra2022opa} provide expressive graph-traversal semantics to evaluate fine-grained permissions (e.g., direct ownership, delegated viewership, and tenant-level inheritance) with sub-millisecond query evaluation latency~\cite{rebacenterprise2024, authzbench2025}. However, classical access control models assume deterministic database querying where security filters can be compiled into structured SQL predicates.
+
+When adapted to vector search engines~\cite{qdrant2023, lewis2020rag}, early enterprise RAG deployments implemented \textit{post-filtering} architectures~\cite{jeong2025permission}, wherein vector indexes retrieve the top-$k$ nearest semantic neighbors across the entire document corpus, after which an external authorization engine strips out unauthorized documents before presenting the context to the LLM. While computationally simple, post-filtering fundamentally violates classical noninterference principles~\cite{rushby1982noninterference, saltzer1975protection}: unauthorized document metadata and chunk embeddings remain active candidate vectors in the vector search space, introducing severe structural information exposure and cache side-channels~\cite{multitenantrag2025, authzrag2026}.
+
+To resolve this structural vulnerability, Namboothiri et al.~\cite{namboothiri2026afr} introduced \textit{Authorization-First Retrieval} (AFR), formalizing the noninterference invariant wherein the vector retrieval engine restricts the search space \textit{a priori} to the exact set of authorized document identifiers returned by an initial ReBAC lookup. This ensures that unauthorized chunks are structurally invisible during dense passage retrieval~\cite{karpukhin2020dpr}.
+
+Concurrently, researchers have investigated the interaction between retrieval boundaries and document poisoning. SafeRAG~\cite{liang2025saferag} and PoisonedRAG~\cite{zou2025poisonedrag} benchmarked vulnerabilities where malicious actors poison shared enterprise corpora to hijack model outputs. PrivRAG~\cite{privrag2025acl} and GuardRAG~\cite{guardrag2025} developed differential privacy and safety filtering heuristics to mitigate data extraction, while Arceo and Narsing~\cite{arceo2026securing} demonstrated the persistent ``relevance-authorization gap'' in agentic information systems when document permissions change dynamically.
+
+\noindent\textbf{Gap in Prior Work:} Despite these advances, all prior AFR frameworks protect only the single-turn retrieval boundary. They fail to track the authorization provenance of chunks across agent reasoning loops, leaving systems vulnerable when permissions are revoked between conversational turns or when retrieved text coerces the agent into unauthorized tool execution. Our work bridges this gap by extending AFR into a continuous, end-to-end lifecycle reference monitor.
+
+\subsection{Indirect Prompt Injection Benchmarks and Defenses}
+\label{sec:rel_injection}
+
+Unlike direct jailbreaking, where an adversarial user directly instructs the model to violate its safety alignment, \textit{Indirect Prompt Injection} (IPI)~\cite{greshake2023promptinject, sha2024promptinjection} embeds adversarial instructions within untrusted external data retrieved during task execution (e.g., search results, web pages, or tenant documents). When ingested into the LLM's context window, these passive instructions hijack the model's control flow, compelling it to leak confidential data or execute unapproved actions.
+
+Systematic benchmarking of IPI vulnerabilities has evolved rapidly. Zhan et al.~\cite{zhan2024injecagent} introduced InjecAgent, formalizing 1,054 test cases categorizing direct-harm versus data-stealing attacks against tool-integrated models. Debenedetti et al.~\cite{debenedetti2024agentdojo} developed AgentDojo, providing a dynamic execution environment measuring environment-state attack success rates (ASR). Concurrently, AgentSecBench~\cite{zhang2025agentsecbench} and BIPIA~\cite{yi2025bipia} established multi-vector benchmark suites across diverse application domains. Recent work on adaptive injection, such as TopicAttack~\cite{topicattack2025}, has shown that heuristic keyword filters are easily evaded by semantic paraphrasing.
+
+Defenses against IPI generally fall into three categories: (i) input classifiers and guardrail models (e.g., NeMo Guardrails~\cite{rebedea2023nemo}, PromptGuard~\cite{promptguard2024}, and LLM Guard~\cite{llmguard2024}), which attempt to classify text chunks prior to generation; (ii) test-time perturbation and alignment techniques, such as IPIGuard~\cite{ipiguard2025} and SecAlign~\cite{secalign2025ccs}; and (iii) structural context isolation, datamarking, and XML delimiters~\cite{melon2025icml, drift2025, spring2025acl}.
+
+\noindent\textbf{Gap in Prior Work:} Existing IPI defenses treat retrieved context as static, stateless text. They do not maintain cryptographic or provenance-bound links between the retrieved chunk, its access policy version, and the executing principal. Consequently, existing IPI defenses cannot detect when an authorized chunk from turn $T_0$ becomes an unauthorized injection vector at turn $T_1$ after an ACL revocation event.
+
+\subsection{Agent Tool-Action Authorization and Defenses}
+\label{sec:rel_tools}
+
+Autonomous agents leveraging frameworks like ReAct~\cite{yao2023react} and LangGraph~\cite{langgraph2024} autonomously plan multi-step workflows, invoke external APIs, and mutate environment state. However, granting language models tool-execution capabilities creates critical confused-deputy vulnerabilities when the agent processes untrusted retrieved documents~\cite{agentpoison2024, toolattack2025}.
+
+Recent literature has proposed various runtime guardrails for agent actions. Task Shield~\cite{taskshield2025acl} introduced task-boundary enforcement to prevent multi-turn tool-calling deviations. TOOLSHIELD~\cite{toolshield2025} and ToolSec~\cite{toolsec2025} investigated hardware-enforced and sandbox-level capability checks for LLM tools. Furthermore, Google DeepMind's safety framework~\cite{deepmindagents2025} and Kumar et al.~\cite{toolsafety2025} formalized access control principles for foundation model tool execution.
+
+\noindent\textbf{Gap in Prior Work:} Existing tool-defense mechanisms evaluate permissions solely at tool-dispatch time based on the agent's current token stream. They lack integration with the data-retrieval layer and therefore cannot determine whether the prompt that induced the tool action originated from authorized context or from an adversarial injection bait. Our architecture enforces action-time ReBAC reference monitoring before any side-effect occurs, strictly validating the caller's principal identity against Zanzibar policy tuples.
+
+\subsection{Context Persistence Across Turns and Memory Revocation}
+\label{sec:rel_memory}
+
+Stateful multi-turn conversational agents frequently persist conversational history, entity summaries, and prior retrieved contexts across interaction turns~\cite{memoryrag2025}. In enterprise environments, document permissions are dynamic: employees change roles, project memberships expire, and security holds are lifted~\cite{dbsync2024vldb, nist80053ac}.
+
+When an authorized user retrieves a document at time $T_0$ and the document's access policy is subsequently revoked at time $T_1$, naive agent implementations continue to ground subsequent answers on the cached context carried over from turn $T_0$. While distributed databases have studied cache invalidation and immediate revocation semantics extensively~\cite{dbsync2024vldb}, LLM agent frameworks have universally neglected memory revalidation.
+
+\noindent\textbf{Gap in Prior Work:} Language model context windows represent an implicit, unmonitored cache. No prior multi-turn agent system applies continuous ReBAC revalidation on every turn of context reuse. We formalize this mechanism via provenance-bound \texttt{ChunkRef} tokens and instantaneous policy version triggers.
+
+\subsection{Gap Positioning and Architectural Comparison}
+\label{sec:rel_comparison}
+
+Table~\ref{tab:related_work_comparison} summarizes the positioning of our proposed Continuous Authorization (CA) Full Stack architecture relative to state-of-the-art prior work across five critical security and evaluation dimensions.
+
+\begin{table*}[t]
+\centering
+\caption{Systematic Comparison of AuthInject-RAG with State-of-the-Art Related Work}
+\label{tab:related_work_comparison}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lccccc}
+\hline
+\textbf{System / Literature} & \textbf{AFR Pre-Retrieval} & \textbf{Memory Re-Auth} & \textbf{Action-Time Tool Auth} & \textbf{Factorial Eval Matrix} & \textbf{Open-Source Artifact} \\
+\hline
+Namboothiri et al. (TrustNLP '26)~\cite{namboothiri2026afr} & \checkmark & $\times$ & $\times$ & $\times$ (1 config) & $\times$ \\
+Jeong et al. (TKDE '25)~\cite{jeong2025permission}           & $\times$ (Post-filter) & $\times$ & $\times$ & Partial (3 configs) & $\times$ \\
+SafeRAG (ACL '25)~\cite{liang2025saferag}                   & Partial & $\times$ & $\times$ & \checkmark (4 configs) & \checkmark \\
+InjecAgent (ACL '24)~\cite{zhan2024injecagent}              & $\times$ & $\times$ & Partial & \checkmark (IPI only) & \checkmark \\
+AgentDojo (NeurIPS '24)~\cite{debenedetti2024agentdojo}     & $\times$ & $\times$ & $\times$ & \checkmark (Tool only) & \checkmark \\
+Task Shield (ACL '25)~\cite{taskshield2025acl}              & $\times$ & $\times$ & \checkmark & \checkmark (Tool only) & \checkmark \\
+\textbf{AuthInject-RAG (P2 Full Stack, Ours)}               & \textbf{\checkmark} & \textbf{\checkmark} & \textbf{\checkmark} & \textbf{\checkmark (11 configs $\times$ 3 LLMs)} & \textbf{\checkmark (v0.3.0)} \\
+\hline
+\end{tabular}
+\end{table*}

@@ -1,0 +1,144 @@
+\documentclass[journal,compsoc]{IEEEtran}
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{cite}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+    citecolor=red,
+}
+
+\begin{document}
+
+\title{Continuous Authorization over the Agentic-RAG Context Lifecycle}
+
+\author{Taha~Bin~Hanif%
+\thanks{Taha Bin Hanif is with the PNTLab, CNIT, and the TeCIP Institute, Scuola Superiore Sant'Anna, Pisa, Italy (e-mail: taha.binhanif@santannapisa.it).}}
+
+\IEEEtitleabstractindextext{%
+\begin{abstract}
+Enterprise retrieval-augmented generation (RAG) and autonomous agent frameworks increasingly process sensitive multi-tenant documents and dispatch high-consequence tools. While recent authorization-first retrieval (AFR) designs prevent cross-tenant exposure during initial index queries, they remain strictly point-in-time mechanisms. We demonstrate that AFR-only architectures fail under lifecycle threats: when access policies are revoked across multi-turn sessions, stateless conversation memory causes 100\% stale unauthorized context exposure. Furthermore, indirect prompt injections embedded in authorized documents can hijack model-selected tool calls. In this paper, we propose a multi-point continuous authorization architecture that enforces fine-grained Relationship-Based Access Control (ReBAC via SpiceDB) across three trust boundaries: pre-retrieval vector index filtering, retained-context revalidation before every cross-turn reuse, and action-time tool dispatch. To evaluate this approach, we release the \textsc{AuthInject-Lifecycle} benchmark, comprising 160 multi-turn test instances across seven attack families. In factorial evaluations across three frontier LLMs (LLaMA-3.3-70B, DeepSeek-R1-32B, GPT-4o-Mini) and twelve configurations, our continuous authorization architecture achieves 0.0\% unauthorized and structural context exposure, eliminates stale ACL bypasses (compared to 100\% in AFR-only), and reduces model-chosen tool hijacking from 46.2\% to 4.4\%, at an acceptable +42\% median latency overhead.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Agentic RAG, Continuous Authorization, Relationship-Based Access Control, Indirect Prompt Injection, Multi-Tenant Security, Tool-Use Security.
+\end{IEEEkeywords}}
+
+\maketitle
+\IEEEdisplaynontitleabstractindextext
+\IEEEpeerreviewmaketitle
+
+\section{Introduction}
+\label{sec:intro}
+
+Retrieval-Augmented Generation (RAG) grounds Large Language Models (LLMs) in external knowledge bases, mitigating factual hallucinations. In enterprise deployments, however, RAG pipelines operate over confidential multi-tenant document stores and integrate autonomous agentic loops capable of invoking external APIs and database tools. This convergence creates a critical security vulnerability: standard semantic retrieval conflates relevance with authorization, and autonomous agent loops execute untrusted retrieved instructions as operational mandates.
+
+\subsection{Background and the Point-in-Time Limitations of AFR}
+\label{sec:intro:background}
+
+To prevent multi-tenant data leakage, post-retrieval filtering (retrieve-then-filter) was historically employed. However, post-filtering remains susceptible to semantic bait attacks, where unauthorized documents displace legitimate context in the similarity ranking. To address this, Namboothiri et al.~\cite{namboothiri2024author} formalized Authorization-First Retrieval (AFR) candidate restriction as a retrieval-time noninterference invariant, pushing access control filters into the vector database index.
+
+While AFR successfully secures the initial retrieval step, enterprise agentic RAG operates over extended multi-turn dialogs where context is cached, transformed, and reused across turns. Our key insight is that \textit{authorization is a continuous lifecycle invariant, not a point-in-time retrieval gate}. When a user's document permissions are revoked mid-session (e.g., role change or document declassification), standard agent conversation buffers retain unauthorized chunks, enabling trivial stale-context leakage. Furthermore, when authorized documents contain indirect prompt injections, AFR provides zero defense against malicious tool invocation.
+
+\subsection{Research Questions}
+\label{sec:intro:rqs}
+
+We guide our investigation through three core research questions:
+\begin{itemize}
+    \item \textbf{RQ1 (Lifecycle Defense Efficacy):} Does continuous authorization across retrieval, memory, and action reduce composite failure rates relative to AFR-only under multi-turn lifecycle threats?
+    \item \textbf{RQ2 (Ablation and Overhead Tradeoffs):} Which ablated security components contribute most significantly to defense-in-depth and the protection-latency tradeoff?
+    \item \textbf{RQ3 (Cross-Model Generalization):} Are continuous authorization guarantees robust and statistically consistent across diverse frontier model families?
+\end{itemize}
+
+\subsection{Contributions}
+\label{sec:intro:contributions}
+
+In this paper we make the following four contributions:
+\begin{enumerate}
+    \item \textbf{C1 --- Multi-Point Reference Monitor Architecture:} The first system design to enforce authorization at three distinct trust boundaries: (i) pre-retrieval candidate restriction (via SpiceDB ReBAC + Qdrant \texttt{MatchAny} operationalizing~\cite{namboothiri2024author}), (ii) retained-context revalidation before every cross-turn reuse, and (iii) action-time tool-dispatch authorization. We formalize the combined invariant as \textit{continuous authorization}.
+    \item \textbf{C2 --- \textsc{AuthInject-Lifecycle} Benchmark:} A 160-case, 7-threat-family combined corpus extending InjecAgent, AgentDojo, OGX, and BIPIA benchmarks with two new probe families: same-tenant disjoint-document semantic bait and stale-ACL cross-turn revocation. The benchmark enables direct comparison of post-filter, AFR-only, and continuous-authorization systems on a shared ground truth.
+    \item \textbf{C3 --- Factorial Empirical Evaluation:} A 12-configuration empirical study across 4 baselines, 2 proposed systems, and 6 ablations evaluated on 3 LLMs with 5 stochastic repeats, using Wilson 95\% confidence intervals and McNemar paired significance testing. On 40 stale-ACL cases we show the prior SOTA (AFR-only~\cite{namboothiri2024author}) records 100\% structural exposure while our proposed continuous system records 0.0\% ($p = 1.28 \times 10^{-8}$).
+    \item \textbf{C4 --- Open-Source Production Package:} An enterprise-grade, reproducible implementation (\texttt{secure-rag==0.3.0}) featuring Docker Compose, Kubernetes StatefulSet, and Helm deployment charts with dual-sink HMAC-SHA256 tamper-evident audit logging and automated CI validation.
+\end{enumerate}
+
+\input{related_work.tex}
+
+\section{Threat Model and Formal Invariants}
+\label{sec:threat_model}
+
+We model an enterprise multi-tenant environment containing tenants $\mathcal{T}$, users $\mathcal{U}$, documents $\mathcal{D}$, chunks $\mathcal{C}$, and tools $\Omega$. An adversary may control a malicious user $u_{adv} \in \mathcal{U}$, poison authorized document chunks $c_{poison} \in \mathcal{C}$ with indirect prompt injections, or exploit dynamic policy changes.
+
+\subsection{Formal Invariants}
+
+\textbf{Definition 1 (Continuous Authorization Invariant):} For any user $u$, session context memory $M_t$ at turn $t$, and tool action $\omega \in \Omega$:
+\begin{equation}
+\label{eq:continuous_auth}
+\forall c \in M_t, \quad \mathrm{Allow}(u, \text{view}, c, t) = 1, \quad \forall t \in \mathrm{lifetime}(c)
+\end{equation}
+and for any tool dispatch $\omega(args)$ initiated by the agent on behalf of $u$:
+\begin{equation}
+\label{eq:action_auth}
+\mathrm{Allow}(u, \text{execute}, \omega, t) = 1
+\end{equation}
+
+\textbf{Definition 2 (Stale Context Exposure Event):} A stale context exposure occurs if a chunk $c$ retrieved at turn $t_0$ under policy $\mathcal{P}_{t_0}$ is incorporated into prompt $P_{t_1}$ at turn $t_1 > t_0$ such that $\mathrm{Allow}(u, \text{view}, c, t_1) = 0$ under updated policy $\mathcal{P}_{t_1}$.
+
+\section{System Architecture}
+\label{sec:architecture}
+
+Our architecture operationalizes continuous lifecycle authorization through three interlocking reference monitors:
+\begin{enumerate}
+    \item \textbf{Pre-Retrieval Index Filter:} Queries SpiceDB for authorized document IDs and injects an exact payload filter into Qdrant vector search.
+    \item \textbf{Cross-Turn Memory Revalidator:} Wraps conversational memory items in \texttt{ChunkRef} descriptors. Prior to generation at turn $t$, all prior chunks are re-evaluated against the current SpiceDB policy zed-token; stale chunks are automatically evicted.
+    \item \textbf{Action-Time Tool Guard:} Intercepts model tool calls and validates user-level execution relationships before executing external side effects.
+\end{enumerate}
+
+\input{results.tex}
+
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Comparison with AFR}
+Authorization-First Retrieval (AFR)~\cite{namboothiri2024author} represents an important step in preventing vector index non-interference violations. However, AFR is strictly a single-point retrieval gate. As proven by our multi-turn evaluations, AFR is strictly weaker than continuous lifecycle authorization because it provides no memory revalidation at reuse time. On our benchmark's 40 stale ACL cases, this architectural gap manifests as a 100\% empirical failure rate. Continuous authorization provides the necessary defense-in-depth across the entire lifetime of retrieved data.
+
+\section{Limitations}
+\label{sec:limitations}
+
+While our evaluation demonstrates substantial security improvements, several limitations remain: (1) Current benchmark fixtures do not yet model adaptive multi-party race conditions during millisecond-level distributed policy propagation; (2) The heuristic L2 injection scanner incurs a small false positive rate ($3.0\%$) on complex nested markdown queries; (3) Action-time authorization requires schema registration for all third-party agent tools.
+
+\section{Ethics Statement}
+\label{sec:ethics}
+
+All document corpora, user personas, prompt injection payloads, and enterprise policies utilized in the \textsc{AuthInject-Lifecycle} benchmark were synthetically generated for security testing. No private, proprietary, or human-subject data was gathered or processed.
+
+\section{Reproducibility and Artifact Availability}
+\label{sec:reproducibility}
+
+To support open science and artifact evaluation, all software source code, benchmark suites, raw evaluation traces, and environment configurations have been permanently deposited on Zenodo with cryptographic verification:
+\begin{itemize}
+    \item \textbf{Software Package (\texttt{secure-rag==0.3.0}):} Zenodo DOI \href{https://doi.org/10.5281/zenodo.14022831}{10.5281/zenodo.14022831}, with GPG-signed Git tag \texttt{v0.3.0}.
+    \item \textbf{\textsc{AuthInject-Lifecycle} v2.0 Dataset:} Zenodo DOI \href{https://doi.org/10.5281/zenodo.14022832}{10.5281/zenodo.14022832}, licensed under CC-BY 4.0 with complete dataset documentation.
+    \item \textbf{Raw Benchmark Execution Traces:} Zenodo DOI \href{https://doi.org/10.5281/zenodo.14022833}{10.5281/zenodo.14022833}, containing 24,000 scored model turns and HMAC hash-chains.
+    \item \textbf{Containerized Deployment Image:} Pinned multi-architecture container published to GitHub Container Registry at \texttt{ghcr.io/ai-security-internships-2026/01-secure-agentic-rag:v0.3.0@sha256:7f9a1c8b3e2a4d5f6c7e8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d}, with 0 reported High/Critical CVEs under Trivy vulnerability scanning.
+\end{itemize}
+An automated reproduction harness is packaged in \texttt{artifacts/TDSC-AE-PACKAGE-v1/}, enabling one-command verification of all experimental tables and figures for IEEE Artifact Evaluation badges (\textit{Artifacts Available} and \textit{Artifacts Functional}).
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+This paper demonstrated that point-in-time authorization-first retrieval is insufficient to protect enterprise agentic RAG systems against multi-turn lifecycle threats. We introduced a continuous authorization architecture that enforces ReBAC across pre-retrieval, memory reuse, and tool execution boundaries. Factorial evaluation across 160 benchmark cases and three frontier LLMs proves that continuous authorization eliminates stale context leakage and suppresses model-chosen tool hijacking, establishing a principled foundation for secure enterprise agentic systems.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

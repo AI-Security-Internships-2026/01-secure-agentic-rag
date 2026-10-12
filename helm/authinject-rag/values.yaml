@@ -16,3 +16,7 @@ resources:
   limits:
     cpu: "1"
     memory: 2Gi
+audit:
+  persistence:
+    enabled: false
+    size: 1Gi

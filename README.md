@@ -1,14 +1,16 @@
-# AuthInject-RAG
+# Continuous Authorization over the Agentic-RAG Context Lifecycle (AuthInject-RAG)
 
-Authorization-first agentic RAG for **combined** cross-tenant leakage and indirect prompt injection.
+[![CI](https://github.com/AI-Security-Internships-2026/01-secure-agentic-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/AI-Security-Internships-2026/01-secure-agentic-rag/actions/workflows/ci.yml)
+
+Continuous authorization and multi-point reference monitors for enterprise agentic RAG across retrieval, multi-turn memory reuse, and tool-action dispatch.
 
 CNIT/PNTLab Pisa · TECIP · Scuola Superiore Sant'Anna — AI Security Internship 2026
 
-## Research questions
+## Research Questions
 
-1. Does authorization-first retrieval prevent **structural exposure** of unauthorized chunks?
-2. Do layered injection defenses stop **poisoned-but-authorized** content without collapsing utility?
-3. What latency and LLM-call cost does combined enforcement add?
+1. **RQ1 (Lifecycle Defense Efficacy):** Does continuous authorization across retrieval, memory, and action reduce composite failures relative to AFR-only under multi-turn lifecycle threats?
+2. **RQ2 (Ablation and Overhead Tradeoffs):** Which ablated components contribute most significantly to defense-in-depth and the protection-latency tradeoff?
+3. **RQ3 (Cross-Model Generalization):** Are continuous authorization guarantees robust and statistically consistent across diverse frontier model families?
 
 Novelty is the **joint** evaluation: authorization failure and indirect injection are measured separately and together. The original Week 8 20-case direct-context experiment is retained as a separate historical ASR track; it is not substituted for the joint benchmark.
 

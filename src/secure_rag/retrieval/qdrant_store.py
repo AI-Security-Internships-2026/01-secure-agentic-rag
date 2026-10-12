@@ -22,7 +22,7 @@ class RetrievedChunk:
 
 class VectorStore(Protocol):
     def upsert(self, points: list[dict[str, Any]]) -> None: ...
-    def delete_document(self, document_id: str) -> None: ...
+    def delete_document(self, tenant_id: str, document_id: str) -> None: ...
     def search(
         self,
         vector: list[float],
@@ -31,7 +31,7 @@ class VectorStore(Protocol):
         tenant_id: str | None = None,
     ) -> list[RetrievedChunk]: ...
     def list_documents(self, allowed_document_ids: list[str] | None = None) -> list[str]: ...
-    def count(self) -> int: ...
+    def count(self, tenant_id: str | None = None, document_id: str | None = None) -> int: ...
 
 
 class QdrantStore:
@@ -75,12 +75,15 @@ class QdrantStore:
             ],
         )
 
-    def delete_document(self, document_id: str) -> None:
+    def delete_document(self, tenant_id: str, document_id: str) -> None:
         self.client.delete(
             collection_name=self.collection,
             points_selector=qmodels.FilterSelector(
                 filter=qmodels.Filter(
-                    must=[qmodels.FieldCondition(key="document_id", match=qmodels.MatchValue(value=document_id))]
+                    must=[
+                        qmodels.FieldCondition(key="tenant_id", match=qmodels.MatchValue(value=tenant_id)),
+                        qmodels.FieldCondition(key="document_id", match=qmodels.MatchValue(value=document_id)),
+                    ]
                 )
             ),
         )
@@ -139,8 +142,14 @@ class QdrantStore:
                 ids.add(doc_id)
         return sorted(ids)
 
-    def count(self) -> int:
-        return int(self.client.count(self.collection).count)
+    def count(self, tenant_id: str | None = None, document_id: str | None = None) -> int:
+        must: list[qmodels.FieldCondition] = []
+        if tenant_id:
+            must.append(qmodels.FieldCondition(key="tenant_id", match=qmodels.MatchValue(value=tenant_id)))
+        if document_id:
+            must.append(qmodels.FieldCondition(key="document_id", match=qmodels.MatchValue(value=document_id)))
+        count_filter = qmodels.Filter(must=must) if must else None
+        return int(self.client.count(collection_name=self.collection, count_filter=count_filter).count)
 
 
 _store: QdrantStore | None = None

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 500" width="100%" height="100%">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="375" y="35" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#111827">Figure 5: Security-Utility Pareto Frontier (12 Configurations)</text>
+  
+  <line x1="100" y1="420" x2="700" y2="420" stroke="#9ca3af" stroke-width="1.5"/>
+  <line x1="100" y1="80" x2="100" y2="420" stroke="#9ca3af" stroke-width="1.5"/>
+  
+  <text x="400" y="460" font-family="Arial" font-size="13" font-weight="bold" text-anchor="middle">Semantic Utility Score (%) -> Higher is Better</text>
+  <text x="35" y="250" font-family="Arial" font-size="13" font-weight="bold" text-anchor="middle" transform="rotate(-90 35 250)">Combined Security Failure Rate (%) -> Lower is Better</text>
+  
+  <text x="90" y="425" font-family="Arial" font-size="11" text-anchor="end">0%</text>
+  <text x="90" y="340" font-family="Arial" font-size="11" text-anchor="end">25%</text>
+  <text x="90" y="255" font-family="Arial" font-size="11" text-anchor="end">50%</text>
+  <text x="90" y="170" font-family="Arial" font-size="11" text-anchor="end">75%</text>
+  <text x="90" y="85" font-family="Arial" font-size="11" text-anchor="end">100%</text>
+  
+  <text x="100" y="440" font-family="Arial" font-size="11" text-anchor="middle">0%</text>
+  <text x="250" y="440" font-family="Arial" font-size="11" text-anchor="middle">25%</text>
+  <text x="400" y="440" font-family="Arial" font-size="11" text-anchor="middle">50%</text>
+  <text x="550" y="440" font-family="Arial" font-size="11" text-anchor="middle">75%</text>
+  <text x="700" y="440" font-family="Arial" font-size="11" text-anchor="middle">100%</text>
+
+  <!-- Pareto Optimal Curve -->
+  <path d="M 688 85 Q 670 290 673 405" fill="none" stroke="#10b981" stroke-width="2.5" stroke-dasharray="5"/>
+  
+  <!-- B0 Ungated -->
+  <circle cx="688" cy="85" r="7" fill="#ef4444"/>
+  <text x="675" y="75" font-family="Arial" font-size="11" font-weight="bold" fill="#b91c1c" text-anchor="end">B0 Ungated (98% Util / 98% Fail)</text>
+  
+  <!-- B1 Post-filter -->
+  <circle cx="634" cy="220" r="6" fill="#f97316"/>
+  <text x="620" y="225" font-family="Arial" font-size="10" text-anchor="end">B1 Post (89% Util / 59% Fail)</text>
+  
+  <!-- B2 AFR-only -->
+  <circle cx="667" cy="290" r="6" fill="#eab308"/>
+  <text x="650" y="295" font-family="Arial" font-size="10" text-anchor="end">B2 AFR-only (94% Util / 38% Fail)</text>
+  
+  <!-- P1 Continuous Auth -->
+  <circle cx="671" cy="355" r="7" fill="#3b82f6"/>
+  <text x="655" y="360" font-family="Arial" font-size="11" font-weight="bold" fill="#1d4ed8" text-anchor="end">P1 Cont. Auth (95% Util / 19% Fail)</text>
+  
+  <!-- P2 Full Stack (Pareto Optimal Knee) -->
+  <circle cx="673" cy="405" r="8" fill="#10b981" stroke="#065f46" stroke-width="2"/>
+  <text x="685" y="395" font-family="Arial" font-size="12" font-weight="bold" fill="#047857">P2 Full Stack (96% Util / 4.4% Fail)</text>
+</svg>

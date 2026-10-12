@@ -11,7 +11,7 @@ definition document {
     relation editor: user
     relation owner: user
 
-    permission view = viewer + editor + owner + tenant->view
+    permission view = viewer + editor + owner
     permission edit = editor + owner
 }
 

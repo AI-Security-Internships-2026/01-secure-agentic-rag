@@ -39,5 +39,19 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+          volumeMounts:
+            - name: audit-logs
+              mountPath: /app/logs
+      volumes:
+        - name: audit-logs
+          {{- if and .Values.audit .Values.audit.persistence .Values.audit.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "authinject.name" . }}-audit-pvc
+          {{- else }}
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi
+          {{- end }}

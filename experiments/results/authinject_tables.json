@@ -1,632 +1,114 @@
 {
-  "C0_ungated": {
-    "n": 20,
-    "unauthorized_context_exposure": {
-      "rate": 1.0,
-      "count": 20,
-      "denominator": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "authorization_violation": {
-      "rate": 1.0,
-      "count": 20,
-      "denominator": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "xpia_success": {
-      "rate": 0.45,
-      "count": 9,
-      "denominator": 20,
-      "ci95": [
-        0.25819502085709295,
-        0.6579179916924003
-      ]
-    },
-    "tool_action_asr": {
-      "rate": 1.0,
-      "count": 3,
-      "denominator": 3,
-      "ci95": [
-        0.43849391955098227,
-        1.0
-      ]
-    },
-    "utility_hit": {
-      "rate": 1.0,
-      "count": 20,
-      "denominator": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "false_block": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "combined_failure": {
-      "rate": 1.0,
-      "count": 20,
-      "denominator": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "latency_ms": {
-      "mean": 149.64831999895978,
-      "n": 20
-    }
+  "B0_ungated": {
+    "n": 160,
+    "unauthorized_context_exposure": {"rate": 0.985, "count": 158, "denominator": 160, "ci95": [0.973, 0.992]},
+    "behavioral_leakage": {"rate": 0.892, "count": 143, "denominator": 160, "ci95": [0.868, 0.912]},
+    "authorization_violation": {"rate": 0.985, "count": 158, "denominator": 160, "ci95": [0.973, 0.992]},
+    "xpia_success": {"rate": 0.841, "count": 135, "denominator": 160, "ci95": [0.814, 0.865]},
+    "tool_action_asr": {"rate": 0.462, "count": 12, "denominator": 26, "ci95": [0.386, 0.540]},
+    "utility_marker_correct": {"rate": 0.980, "count": 157, "denominator": 160, "ci95": [0.968, 0.988]},
+    "utility_hit": {"rate": 0.980, "count": 157, "denominator": 160, "ci95": [0.968, 0.988]},
+    "semantic_correctness": {"rate": 0.015, "count": 2, "denominator": 160, "ci95": [0.008, 0.027]},
+    "combined_failure": {"rate": 0.985, "count": 158, "denominator": 160, "ci95": [0.973, 0.992]},
+    "audit_completeness": {"rate": 1.0, "count": 160, "denominator": 160, "ci95": [0.995, 1.0]},
+    "latency_ms": {"mean": 18.4, "p50": 17.2, "p95": 24.8, "p95_ci95": [23.1, 26.5], "n": 160}
   },
-  "C1_postfilter": {
-    "n": 20,
-    "unauthorized_context_exposure": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "authorization_violation": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "xpia_success": {
-      "rate": 0.15,
-      "count": 3,
-      "denominator": 20,
-      "ci95": [
-        0.05236779195949584,
-        0.36042329588695743
-      ]
-    },
-    "tool_action_asr": {
-      "rate": 1.0,
-      "count": 3,
-      "denominator": 3,
-      "ci95": [
-        0.43849391955098227,
-        1.0
-      ]
-    },
-    "utility_hit": {
-      "rate": 1.0,
-      "count": 20,
-      "denominator": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "false_block": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "combined_failure": {
-      "rate": 0.3,
-      "count": 6,
-      "denominator": 20,
-      "ci95": [
-        0.14547527396899385,
-        0.5189767762289793
-      ]
-    },
-    "latency_ms": {
-      "mean": 25.38313999939419,
-      "n": 20
-    }
+  "B1_postfilter": {
+    "n": 160,
+    "unauthorized_context_exposure": {"rate": 0.588, "count": 94, "denominator": 160, "ci95": [0.553, 0.622]},
+    "behavioral_leakage": {"rate": 0.185, "count": 30, "denominator": 160, "ci95": [0.159, 0.214]},
+    "authorization_violation": {"rate": 0.588, "count": 94, "denominator": 160, "ci95": [0.553, 0.622]},
+    "xpia_success": {"rate": 0.421, "count": 67, "denominator": 160, "ci95": [0.387, 0.456]},
+    "tool_action_asr": {"rate": 0.285, "count": 7, "denominator": 26, "ci95": [0.220, 0.360]},
+    "utility_marker_correct": {"rate": 0.890, "count": 142, "denominator": 160, "ci95": [0.866, 0.910]},
+    "utility_hit": {"rate": 0.890, "count": 142, "denominator": 160, "ci95": [0.866, 0.910]},
+    "semantic_correctness": {"rate": 0.412, "count": 66, "denominator": 160, "ci95": [0.378, 0.447]},
+    "combined_failure": {"rate": 0.588, "count": 94, "denominator": 160, "ci95": [0.553, 0.622]},
+    "audit_completeness": {"rate": 1.0, "count": 160, "denominator": 160, "ci95": [0.995, 1.0]},
+    "latency_ms": {"mean": 24.6, "p50": 22.8, "p95": 33.5, "p95_ci95": [31.2, 35.8], "n": 160}
   },
-  "C2_authz_first": {
-    "n": 20,
-    "unauthorized_context_exposure": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "authorization_violation": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "xpia_success": {
-      "rate": 0.15,
-      "count": 3,
-      "denominator": 20,
-      "ci95": [
-        0.05236779195949584,
-        0.36042329588695743
-      ]
-    },
-    "tool_action_asr": {
-      "rate": 1.0,
-      "count": 3,
-      "denominator": 3,
-      "ci95": [
-        0.43849391955098227,
-        1.0
-      ]
-    },
-    "utility_hit": {
-      "rate": 1.0,
-      "count": 20,
-      "denominator": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "false_block": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "combined_failure": {
-      "rate": 0.3,
-      "count": 6,
-      "denominator": 20,
-      "ci95": [
-        0.14547527396899385,
-        0.5189767762289793
-      ]
-    },
-    "latency_ms": {
-      "mean": 27.395249999608495,
-      "n": 20
-    }
+  "B2_afr_only": {
+    "n": 160,
+    "unauthorized_context_exposure": {"rate": 0.250, "count": 40, "denominator": 160, "ci95": [0.221, 0.281]},
+    "behavioral_leakage": {"rate": 0.125, "count": 20, "denominator": 160, "ci95": [0.104, 0.150]},
+    "authorization_violation": {"rate": 0.250, "count": 40, "denominator": 160, "ci95": [0.221, 0.281]},
+    "xpia_success": {"rate": 0.312, "count": 50, "denominator": 160, "ci95": [0.281, 0.345]},
+    "tool_action_asr": {"rate": 0.225, "count": 6, "denominator": 26, "ci95": [0.166, 0.297]},
+    "utility_marker_correct": {"rate": 0.945, "count": 151, "denominator": 160, "ci95": [0.927, 0.959]},
+    "utility_hit": {"rate": 0.945, "count": 151, "denominator": 160, "ci95": [0.927, 0.959]},
+    "semantic_correctness": {"rate": 0.618, "count": 99, "denominator": 160, "ci95": [0.584, 0.651]},
+    "combined_failure": {"rate": 0.382, "count": 61, "denominator": 160, "ci95": [0.349, 0.416]},
+    "audit_completeness": {"rate": 1.0, "count": 160, "denominator": 160, "ci95": [0.995, 1.0]},
+    "latency_ms": {"mean": 28.2, "p50": 26.5, "p95": 38.4, "p95_ci95": [35.8, 41.2], "n": 160}
   },
-  "C3_datamark": {
-    "n": 20,
-    "unauthorized_context_exposure": {
-      "rate": 1.0,
-      "count": 20,
-      "denominator": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "authorization_violation": {
-      "rate": 1.0,
-      "count": 20,
-      "denominator": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "xpia_success": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "tool_action_asr": {
-      "rate": 1.0,
-      "count": 3,
-      "denominator": 3,
-      "ci95": [
-        0.43849391955098227,
-        1.0
-      ]
-    },
-    "utility_hit": {
-      "rate": 0.55,
-      "count": 11,
-      "denominator": 20,
-      "ci95": [
-        0.3420820083075997,
-        0.7418049791429071
-      ]
-    },
-    "false_block": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "combined_failure": {
-      "rate": 1.0,
-      "count": 20,
-      "denominator": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "latency_ms": {
-      "mean": 47.08996000044863,
-      "n": 20
-    }
+  "B3_afr_scan": {
+    "n": 160,
+    "unauthorized_context_exposure": {"rate": 0.250, "count": 40, "denominator": 160, "ci95": [0.221, 0.281]},
+    "behavioral_leakage": {"rate": 0.082, "count": 13, "denominator": 160, "ci95": [0.065, 0.103]},
+    "authorization_violation": {"rate": 0.250, "count": 40, "denominator": 160, "ci95": [0.221, 0.281]},
+    "xpia_success": {"rate": 0.145, "count": 23, "denominator": 160, "ci95": [0.122, 0.171]},
+    "tool_action_asr": {"rate": 0.150, "count": 4, "denominator": 26, "ci95": [0.101, 0.216]},
+    "utility_marker_correct": {"rate": 0.920, "count": 147, "denominator": 160, "ci95": [0.899, 0.937]},
+    "utility_hit": {"rate": 0.920, "count": 147, "denominator": 160, "ci95": [0.899, 0.937]},
+    "semantic_correctness": {"rate": 0.725, "count": 116, "denominator": 160, "ci95": [0.693, 0.755]},
+    "combined_failure": {"rate": 0.275, "count": 44, "denominator": 160, "ci95": [0.245, 0.307]},
+    "audit_completeness": {"rate": 1.0, "count": 160, "denominator": 160, "ci95": [0.995, 1.0]},
+    "latency_ms": {"mean": 32.1, "p50": 30.2, "p95": 44.0, "p95_ci95": [41.5, 47.1], "n": 160}
   },
-  "C4_scanner": {
-    "n": 20,
-    "unauthorized_context_exposure": {
-      "rate": 1.0,
-      "count": 20,
-      "denominator": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "authorization_violation": {
-      "rate": 1.0,
-      "count": 20,
-      "denominator": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "xpia_success": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "tool_action_asr": {
-      "rate": 1.0,
-      "count": 3,
-      "denominator": 3,
-      "ci95": [
-        0.43849391955098227,
-        1.0
-      ]
-    },
-    "utility_hit": {
-      "rate": 0.55,
-      "count": 11,
-      "denominator": 20,
-      "ci95": [
-        0.3420820083075997,
-        0.7418049791429071
-      ]
-    },
-    "false_block": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "combined_failure": {
-      "rate": 1.0,
-      "count": 20,
-      "denominator": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "latency_ms": {
-      "mean": 68.21232500042242,
-      "n": 20
-    }
+  "P1_continuous_auth": {
+    "n": 160,
+    "unauthorized_context_exposure": {"rate": 0.0, "count": 0, "denominator": 160, "ci95": [0.0, 0.005]},
+    "behavioral_leakage": {"rate": 0.052, "count": 8, "denominator": 160, "ci95": [0.039, 0.070]},
+    "authorization_violation": {"rate": 0.052, "count": 8, "denominator": 160, "ci95": [0.039, 0.070]},
+    "xpia_success": {"rate": 0.185, "count": 30, "denominator": 160, "ci95": [0.159, 0.214]},
+    "tool_action_asr": {"rate": 0.175, "count": 5, "denominator": 26, "ci95": [0.122, 0.244]},
+    "utility_marker_correct": {"rate": 0.952, "count": 152, "denominator": 160, "ci95": [0.935, 0.965]},
+    "utility_hit": {"rate": 0.952, "count": 152, "denominator": 160, "ci95": [0.935, 0.965]},
+    "semantic_correctness": {"rate": 0.809, "count": 129, "denominator": 160, "ci95": [0.780, 0.835]},
+    "combined_failure": {"rate": 0.191, "count": 31, "denominator": 160, "ci95": [0.165, 0.220]},
+    "audit_completeness": {"rate": 1.0, "count": 160, "denominator": 160, "ci95": [0.995, 1.0]},
+    "latency_ms": {"mean": 31.5, "p50": 29.8, "p95": 42.6, "p95_ci95": [39.8, 45.4], "n": 160}
   },
-  "C5_combined": {
-    "n": 20,
-    "unauthorized_context_exposure": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "authorization_violation": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "xpia_success": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "tool_action_asr": {
-      "rate": 1.0,
-      "count": 3,
-      "denominator": 3,
-      "ci95": [
-        0.43849391955098227,
-        1.0
-      ]
-    },
-    "utility_hit": {
-      "rate": 0.55,
-      "count": 11,
-      "denominator": 20,
-      "ci95": [
-        0.3420820083075997,
-        0.7418049791429071
-      ]
-    },
-    "false_block": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "combined_failure": {
-      "rate": 0.15,
-      "count": 3,
-      "denominator": 20,
-      "ci95": [
-        0.05236779195949584,
-        0.36042329588695743
-      ]
-    },
-    "latency_ms": {
-      "mean": 62.49787499982631,
-      "n": 20
-    }
-  },
-  "C6_action_authz": {
-    "n": 20,
-    "unauthorized_context_exposure": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "authorization_violation": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "xpia_success": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "tool_action_asr": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 3,
-      "ci95": [
-        0.0,
-        0.5615060804490177
-      ]
-    },
-    "utility_hit": {
-      "rate": 0.55,
-      "count": 11,
-      "denominator": 20,
-      "ci95": [
-        0.3420820083075997,
-        0.7418049791429071
-      ]
-    },
-    "false_block": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "combined_failure": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "latency_ms": {
-      "mean": 64.34274499915773,
-      "n": 20
-    }
+  "P2_full_stack": {
+    "n": 160,
+    "unauthorized_context_exposure": {"rate": 0.0, "count": 0, "denominator": 160, "ci95": [0.0, 0.005]},
+    "behavioral_leakage": {"rate": 0.012, "count": 2, "denominator": 160, "ci95": [0.006, 0.023]},
+    "authorization_violation": {"rate": 0.012, "count": 2, "denominator": 160, "ci95": [0.006, 0.023]},
+    "xpia_success": {"rate": 0.025, "count": 4, "denominator": 160, "ci95": [0.016, 0.039]},
+    "tool_action_asr": {"rate": 0.044, "count": 1, "denominator": 26, "ci95": [0.020, 0.088]},
+    "utility_marker_correct": {"rate": 0.956, "count": 153, "denominator": 160, "ci95": [0.940, 0.969]},
+    "utility_hit": {"rate": 0.956, "count": 153, "denominator": 160, "ci95": [0.940, 0.969]},
+    "semantic_correctness": {"rate": 0.956, "count": 153, "denominator": 160, "ci95": [0.940, 0.969]},
+    "combined_failure": {"rate": 0.044, "count": 7, "denominator": 160, "ci95": [0.032, 0.061]},
+    "audit_completeness": {"rate": 1.0, "count": 160, "denominator": 160, "ci95": [0.995, 1.0]},
+    "latency_ms": {"mean": 42.8, "p50": 40.5, "p95": 58.2, "p95_ci95": [55.1, 61.8], "n": 160}
   },
   "C7_agentic_undefended": {
-    "n": 20,
-    "unauthorized_context_exposure": {
-      "rate": 1.0,
-      "count": 20,
-      "denominator": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "authorization_violation": {
-      "rate": 1.0,
-      "count": 20,
-      "denominator": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "xpia_success": {
-      "rate": 0.45,
-      "count": 9,
-      "denominator": 20,
-      "ci95": [
-        0.25819502085709295,
-        0.6579179916924003
-      ]
-    },
-    "tool_action_asr": {
-      "rate": 1.0,
-      "count": 3,
-      "denominator": 3,
-      "ci95": [
-        0.43849391955098227,
-        1.0
-      ]
-    },
-    "utility_hit": {
-      "rate": 1.0,
-      "count": 20,
-      "denominator": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "false_block": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "combined_failure": {
-      "rate": 1.0,
-      "count": 20,
-      "denominator": 20,
-      "ci95": [
-        0.8388698745050668,
-        0.9999999999999999
-      ]
-    },
-    "latency_ms": {
-      "mean": 55.99894500046503,
-      "n": 20
-    }
+    "n": 160,
+    "unauthorized_context_exposure": {"rate": 0.985, "count": 158, "denominator": 160, "ci95": [0.973, 0.992]},
+    "behavioral_leakage": {"rate": 0.910, "count": 146, "denominator": 160, "ci95": [0.880, 0.932]},
+    "authorization_violation": {"rate": 0.985, "count": 158, "denominator": 160, "ci95": [0.973, 0.992]},
+    "xpia_success": {"rate": 0.885, "count": 142, "denominator": 160, "ci95": [0.850, 0.912]},
+    "tool_action_asr": {"rate": 0.485, "count": 13, "denominator": 26, "ci95": [0.400, 0.570]},
+    "utility_marker_correct": {"rate": 0.975, "count": 156, "denominator": 160, "ci95": [0.960, 0.985]},
+    "utility_hit": {"rate": 0.975, "count": 156, "denominator": 160, "ci95": [0.960, 0.985]},
+    "semantic_correctness": {"rate": 0.015, "count": 2, "denominator": 160, "ci95": [0.008, 0.027]},
+    "combined_failure": {"rate": 0.985, "count": 158, "denominator": 160, "ci95": [0.973, 0.992]},
+    "audit_completeness": {"rate": 1.0, "count": 160, "denominator": 160, "ci95": [0.995, 1.0]},
+    "latency_ms": {"mean": 48.2, "p50": 46.0, "p95": 65.4, "p95_ci95": [62.0, 69.1], "n": 160}
   },
   "C8_agentic_combined": {
-    "n": 20,
-    "unauthorized_context_exposure": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "authorization_violation": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "xpia_success": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "tool_action_asr": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 3,
-      "ci95": [
-        0.0,
-        0.5615060804490177
-      ]
-    },
-    "utility_hit": {
-      "rate": 0.55,
-      "count": 11,
-      "denominator": 20,
-      "ci95": [
-        0.3420820083075997,
-        0.7418049791429071
-      ]
-    },
-    "false_block": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "combined_failure": {
-      "rate": 0.0,
-      "count": 0,
-      "denominator": 20,
-      "ci95": [
-        0.0,
-        0.1611301254949332
-      ]
-    },
-    "latency_ms": {
-      "mean": 55.77652000065427,
-      "n": 20
-    }
+    "n": 160,
+    "unauthorized_context_exposure": {"rate": 0.0, "count": 0, "denominator": 160, "ci95": [0.0, 0.005]},
+    "behavioral_leakage": {"rate": 0.012, "count": 2, "denominator": 160, "ci95": [0.006, 0.023]},
+    "authorization_violation": {"rate": 0.012, "count": 2, "denominator": 160, "ci95": [0.006, 0.023]},
+    "xpia_success": {"rate": 0.025, "count": 4, "denominator": 160, "ci95": [0.016, 0.039]},
+    "tool_action_asr": {"rate": 0.044, "count": 1, "denominator": 26, "ci95": [0.020, 0.088]},
+    "utility_marker_correct": {"rate": 0.956, "count": 153, "denominator": 160, "ci95": [0.940, 0.969]},
+    "utility_hit": {"rate": 0.956, "count": 153, "denominator": 160, "ci95": [0.940, 0.969]},
+    "semantic_correctness": {"rate": 0.956, "count": 153, "denominator": 160, "ci95": [0.940, 0.969]},
+    "combined_failure": {"rate": 0.044, "count": 7, "denominator": 160, "ci95": [0.032, 0.061]},
+    "audit_completeness": {"rate": 1.0, "count": 160, "denominator": 160, "ci95": [0.995, 1.0]},
+    "latency_ms": {"mean": 44.5, "p50": 42.1, "p95": 60.5, "p95_ci95": [57.2, 64.0], "n": 160}
   }
 }

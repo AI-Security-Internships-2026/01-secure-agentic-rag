@@ -72,6 +72,8 @@ services:
       APP_ENV: ${APP_ENV:-development}
       SPICEDB_ENDPOINT: spicedb:50051
       QDRANT_URL: http://qdrant:6333
+    volumes:
+      - ./.data/logs:/app/logs
     depends_on:
       spicedb:
         condition: service_started
