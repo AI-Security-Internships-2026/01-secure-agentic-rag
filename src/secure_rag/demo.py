@@ -455,7 +455,7 @@ def step_tool_guard(demo: Demo) -> None:
     demo.check("With all defenses on nothing is executed", not any(r["allowed"] for r in full.get("tool_results", [])))
 
 
-class _UnreachableSpiceDB:
+class UnreachableSpiceDB:
     def __getattr__(self, name: str) -> Callable[..., Any]:
         from secure_rag.authz.client import AuthorizationError
 
@@ -475,7 +475,7 @@ def step_fail_closed(demo: Demo) -> None:
     seed(demo)
     out.say("We simulate SpiceDB going down. Every path must refuse instead of guessing.")
     saved = authz_module._client
-    authz_module._client = _UnreachableSpiceDB()
+    authz_module._client = UnreachableSpiceDB()
     try:
         query = demo.ask("alice", FINANCE, "What was the Q3 revenue?")
         tool = execute_tool(

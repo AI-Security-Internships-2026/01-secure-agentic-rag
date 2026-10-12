@@ -11,6 +11,7 @@ CNIT/PNTLab Pisa · TECIP · Scuola Superiore Sant'Anna, AI Security Internship 
 ```bash
 ./run.sh setup    # once
 ./run.sh demo     # guided demo of every defense, offline: no Docker, no LLM
+./run.sh ui       # browser playground: upload your own files and query them live
 ./run.sh help     # every other way to run it: API, curl walkthrough, CLI, results, benchmark, Docker services
 ```
 

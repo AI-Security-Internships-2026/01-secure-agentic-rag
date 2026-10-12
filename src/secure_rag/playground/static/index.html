@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AuthInject RAG Playground</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <strong>AuthInject RAG</strong>
+      <span class="muted">playground</span>
+    </div>
+    <div class="status">
+      <span id="mode-badge" class="badge">loading</span>
+      <span id="policy-badge" class="badge">policy v1</span>
+      <label class="switch">
+        <input type="checkbox" id="outage-toggle">
+        <span>Simulate SpiceDB outage</span>
+      </label>
+      <button id="reset-btn" class="ghost" type="button">Reset everything</button>
+    </div>
+  </header>
+  <div id="outage-banner" class="banner" hidden>SpiceDB is unreachable. Every check now fails closed: no answers, no uploads, no tool calls.</div>
+
+  <main class="layout">
+    <aside class="column">
+      <section class="card">
+        <h2>Acting as</h2>
+        <div class="presets" id="presets"></div>
+        <form id="session-form" class="row">
+          <input id="user-input" aria-label="user" placeholder="user" required>
+          <span class="muted">@</span>
+          <input id="tenant-input" aria-label="tenant" placeholder="tenant" required>
+          <button type="submit">Switch</button>
+        </form>
+        <p class="muted small">Every request carries a signed JWT for this user. Identity never comes from the request body.</p>
+      </section>
+
+      <section class="card">
+        <h2>Upload a document</h2>
+        <label class="field">Start from a sample
+          <select id="sample-select"><option value="">Your own file or text</option></select>
+        </label>
+        <div id="sample-hint" class="hint" hidden></div>
+        <label class="field">File (PDF, TXT, MD)
+          <input type="file" id="file-input" accept=".pdf,.txt,.md,.csv,.json,.log">
+        </label>
+        <label class="field">or paste text
+          <textarea id="text-input" rows="5" placeholder="Paste any text here"></textarea>
+        </label>
+        <div class="grid-2">
+          <label class="field">Document id
+            <input id="docid-input" placeholder="from the file name">
+          </label>
+          <label class="field">Viewers
+            <input id="viewers-input" placeholder="bob, carol">
+          </label>
+        </div>
+        <label class="check"><input type="checkbox" id="redact-input" checked> Remove PII before storing</label>
+        <button id="upload-btn" class="primary" type="button">Upload as <span class="who"></span></button>
+        <div id="upload-result"></div>
+      </section>
+
+      <section class="card">
+        <h2>Tool permissions</h2>
+        <p class="muted small">SpiceDB decides who may run a tool. The model only proposes calls.</p>
+        <div id="tools"></div>
+      </section>
+
+      <section class="card">
+        <details>
+          <summary>Try this story</summary>
+          <ol class="story small">
+            <li>As <b>dave@finance</b>, upload the samples <i>Payroll</i> and <i>Budget shared with Alice</i>.</li>
+            <li>As <b>alice@finance</b>, upload <i>Q3 report with PII</i> and compare the uploaded and stored text.</li>
+            <li>Ask <q>What is the CEO salary this year?</q> and press <b>Compare none, post, pre</b>.</li>
+            <li>Turn on <b>Chat memory</b>, pick <i>budget-2027</i> and ask <q>What does the 2027 budget plan cut?</q></li>
+            <li>Switch to <b>dave</b>, remove alice from the budget viewers, switch back to <b>alice</b>.</li>
+            <li>Ask <q>How big is the travel cut?</q> with <b>Continuous authorization</b> off, then on.</li>
+            <li>Upload <i>Poisoned vendor FAQ</i> and ask about vendor payment terms with the detector on and off.</li>
+            <li>Upload <i>IT ticket with hidden tool call</i>, turn off detector, isolation and datamarking, ask about IT tickets with the tool guard off and on.</li>
+            <li>Turn on <b>Simulate SpiceDB outage</b> and ask anything. Then press <b>Verify chain</b>.</li>
+          </ol>
+        </details>
+      </section>
+    </aside>
+
+    <section class="column">
+      <section class="card">
+        <div class="card-head">
+          <h2>Documents in the index</h2>
+          <button id="refresh-docs" class="ghost" type="button">Refresh</button>
+        </div>
+        <p class="muted small">Every document in the vector store, with what SpiceDB says about it. Only owners and editors can change access.</p>
+        <div id="docs"></div>
+      </section>
+
+      <section class="card">
+        <h2>Ask</h2>
+        <form id="ask-form">
+          <textarea id="question-input" rows="2" placeholder="What was the Q3 revenue?" required></textarea>
+          <div class="controls">
+            <label class="field inline">Document
+              <select id="doc-filter"><option value="">all I may read</option></select>
+            </label>
+            <fieldset class="segmented" aria-label="filtering mode">
+              <label><input type="radio" name="mode" value="pre" checked><span>pre</span></label>
+              <label><input type="radio" name="mode" value="post"><span>post</span></label>
+              <label><input type="radio" name="mode" value="none"><span>none</span></label>
+            </fieldset>
+            <label class="field inline">Generator
+              <select id="generator-select">
+                <option value="extractive">extractive (offline)</option>
+                <option value="llm">LLM from .env</option>
+              </select>
+            </label>
+          </div>
+          <p id="mode-help" class="muted small"></p>
+          <div class="toggles">
+            <label class="check"><input type="checkbox" id="t-scan" checked> Injection detector</label>
+            <label class="check"><input type="checkbox" id="t-isolation" checked> Context isolation</label>
+            <label class="check"><input type="checkbox" id="t-datamark" checked> Datamarking</label>
+            <label class="check"><input type="checkbox" id="t-toolguard" checked> Tool guard</label>
+            <label class="check"><input type="checkbox" id="t-continuous" checked> Continuous authorization</label>
+            <label class="check"><input type="checkbox" id="t-memory"> Chat memory</label>
+          </div>
+          <div class="row">
+            <button class="primary" type="submit">Ask as <span class="who"></span></button>
+            <button type="button" id="compare-btn">Compare none, post, pre</button>
+            <span id="memory-status" class="muted small"></span>
+            <button type="button" id="clear-memory" class="ghost" hidden>Clear memory</button>
+          </div>
+        </form>
+        <div id="answer"></div>
+      </section>
+    </section>
+
+    <aside class="column">
+      <section class="card sticky">
+        <div class="card-head">
+          <h2>Audit log</h2>
+          <button id="verify-btn" class="ghost" type="button">Verify chain</button>
+        </div>
+        <p id="audit-meta" class="muted small">Live: new events appear as they happen.</p>
+        <p id="verify-result" class="small"></p>
+        <ol id="audit" class="audit"></ol>
+      </section>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
