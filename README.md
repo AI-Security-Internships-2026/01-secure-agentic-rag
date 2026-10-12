@@ -4,7 +4,17 @@
 
 Continuous authorization and multi-point reference monitors for enterprise agentic RAG across retrieval, multi-turn memory reuse, and tool-action dispatch.
 
-CNIT/PNTLab Pisa · TECIP · Scuola Superiore Sant'Anna — AI Security Internship 2026
+CNIT/PNTLab Pisa · TECIP · Scuola Superiore Sant'Anna, AI Security Internship 2026
+
+## Quick start
+
+```bash
+./run.sh setup    # once
+./run.sh demo     # guided demo of every defense, offline: no Docker, no LLM
+./run.sh help     # every other way to run it: API, curl walkthrough, CLI, results, benchmark, Docker services
+```
+
+[DEMO.md](DEMO.md) has the step by step presenter guide.
 
 ## Research Questions
 
@@ -21,7 +31,7 @@ Novelty is the **joint** evaluation: authorization failure and indirect injectio
 | Aug 9: retrieved-document injection threat + first mitigation | Complete | `docs/threat_model.md`, `src/secure_rag/agent/guardrails.py` |
 | Aug 16: poisoned/clean set + ASR before/after | Complete, historical | `experiments/run_indirect_injection_eval.py`, `experiments/results/indirect_injection_eval.json` |
 | Aug 23: agent loop × defense ablation | Wired as C7/C8; live measurement pending | `src/secure_rag/benchmark/runner.py`, `docs/indirect-injection-evaluation.md` |
-| Aug 30: benchmark vs non-agentic baseline | Complete offline | C0–C8 in `experiments/results/authinject_eval.json` |
+| Aug 30: benchmark vs non-agentic baseline | Complete offline | C0 to C8 in `experiments/results/authinject_eval.json` |
 
 The Week 9 AuthInject scope **extends** the original retrieved-document threat
 with cross-tenant authorization and tool-action boundaries. It does not replace

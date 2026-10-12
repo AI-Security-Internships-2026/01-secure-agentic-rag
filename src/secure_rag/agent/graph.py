@@ -25,6 +25,11 @@ from secure_rag.settings import Settings, get_settings
 FilteringMode = Literal["none", "pre", "post", "research_baseline_none"]
 FILTERING_MODES = frozenset({"none", "pre", "post", "research_baseline_none"})
 
+NO_CONTEXT_MESSAGE = "No relevant context found in the database to answer this question."
+# Fixed system messages carry no user data; running PII detection on them mangles words
+# such as "Alert", which Presidio tags as a PERSON.
+SYSTEM_MESSAGES = frozenset({BLOCKED_INJECTION_MESSAGE, NO_CONTEXT_MESSAGE})
+
 
 @dataclass
 class ChunkRef:
@@ -485,7 +490,7 @@ def generate_answer(state: AgentState) -> dict:
     if not contexts:
         if state.get("diagnostics", {}).get("indirect_injection_detected"):
             return {"answer": BLOCKED_INJECTION_MESSAGE}
-        return {"answer": "No relevant context found in the database to answer this question."}
+        return {"answer": NO_CONTEXT_MESSAGE}
     marked = [datamark(c) if state.get("enable_datamarking", True) else c for c in contexts]
     isolate = bool(state.get("enable_context_isolation", True))
     use_llm = state.get("generator") == "llm" or (state.get("generator") != "extractive" and settings.app_env != "test")
@@ -501,7 +506,7 @@ def generate_answer(state: AgentState) -> dict:
 
 def guard_output(state: AgentState) -> dict:
     answer = str(state.get("answer", ""))
-    if get_settings().app_env != "test":
+    if get_settings().app_env != "test" and answer not in SYSTEM_MESSAGES:
         answer = anonymize_text(answer)
     emit(
         "query.completed",
